@@ -1,15 +1,15 @@
 'use client';
 
 import React from 'react';
-import { Player } from '@/data/players';
-import { X, CheckCircle2, AlertTriangle, ShieldCheck, Target, Flame, BarChart3 } from 'lucide-react';
+import { HLPRSPlayer } from '@/data/players';
+import { X, CheckCircle2, AlertTriangle, ShieldCheck, Target, Flame } from 'lucide-react';
 
 interface PlayerScoutingDrawerProps {
-  player: Player | null;
+  player: HLPRSPlayer | null;
   isOpen: boolean;
   onClose: () => void;
   isSelectedForAuction: boolean;
-  onToggleAuction: (player: Player) => void;
+  onToggleAuction: (player: HLPRSPlayer) => void;
 }
 
 export default function PlayerScoutingDrawer({
@@ -20,8 +20,6 @@ export default function PlayerScoutingDrawer({
   onToggleAuction,
 }: PlayerScoutingDrawerProps) {
   if (!isOpen || !player) return null;
-
-  const { scoutingReport } = player;
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/70 backdrop-blur-sm transition-opacity animate-in fade-in">
@@ -38,7 +36,7 @@ export default function PlayerScoutingDrawer({
               #{player.rank}
             </span>
             <span className="text-xs uppercase tracking-wider text-slate-400 font-semibold">
-              Official Scouting Dossier
+              HL-PRS v7 Dossier • ID: {player.player_id}
             </span>
           </div>
 
@@ -54,12 +52,12 @@ export default function PlayerScoutingDrawer({
               {isSelectedForAuction ? (
                 <>
                   <X className="h-3.5 w-3.5" />
-                  Remove from Target Buys
+                  Remove Target
                 </>
               ) : (
                 <>
                   <CheckCircle2 className="h-3.5 w-3.5" />
-                  Add to Target Buys
+                  Select Target
                 </>
               )}
             </button>
@@ -74,7 +72,7 @@ export default function PlayerScoutingDrawer({
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           
           {/* Hero Profile Block */}
           <div className="rounded-xl border border-slate-700/70 bg-[#1E293B]/80 p-5 shadow-lg relative overflow-hidden">
@@ -83,31 +81,34 @@ export default function PlayerScoutingDrawer({
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-slate-900 to-[#1E293B] border-2 border-[#EA1A85]/60 text-xl font-black text-white shadow-md">
-                  {player.name.split(' ').map(n => n[0]).join('')}
+                  {player.player_name.split(' ').map(n => n[0]).join('')}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-xl font-bold text-white tracking-tight">{player.name}</h2>
-                    <span className="rounded bg-[#EA1A85]/20 px-2 py-0.5 text-[10px] font-bold text-[#EA1A85] border border-[#EA1A85]/30">
-                      Uncapped
-                    </span>
+                    <h2 className="text-xl font-bold text-white tracking-tight">{player.player_name}</h2>
+                    {player.contractStatus && (
+                      <span className={`rounded px-2 py-0.5 text-[10px] font-bold border ${
+                        player.contractStatus.includes('Released')
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                          : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                      }`}>
+                        {player.contractStatus}
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    {player.age} yrs • {player.domesticTeam} • {player.role}
-                  </p>
-                  <p className="text-[11px] text-slate-400 mt-1 font-mono">
-                    {player.battingStyle} {player.bowlingStyle ? `• ${player.bowlingStyle}` : ''}
+                    {player.nationality} • {player.role} • {player.total_matches} T20 matches
                   </p>
                 </div>
               </div>
 
-              {/* Scout Grade */}
+              {/* HL-PRS v7 Score Badge */}
               <div className="flex items-center sm:flex-col items-end gap-1 bg-slate-900/80 px-3.5 py-2 rounded-xl border border-slate-800">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Scout Grade</span>
+                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">HL-PRS v7 Score</span>
                 <div className="flex items-center gap-1.5">
-                  <Flame className="h-4 w-4 text-[#F59E0B]" />
-                  <span className="text-lg font-black font-mono text-[#F59E0B]">{scoutingReport.scoutRating}</span>
-                  <span className="text-xs text-slate-500 font-semibold">/ 10</span>
+                  <Flame className="h-4 w-4 text-[#EA1A85]" />
+                  <span className="text-xl font-black font-mono text-[#EA1A85]">{player.hl_prs_score}</span>
+                  <span className="text-xs text-slate-500 font-semibold">/ 100</span>
                 </div>
               </div>
             </div>
@@ -115,144 +116,114 @@ export default function PlayerScoutingDrawer({
             {/* Quick Metrics Strip */}
             <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 pt-4 border-t border-slate-800 text-center">
               <div className="rounded-lg bg-slate-900/60 p-2 border border-slate-800">
-                <span className="text-[10px] text-slate-400 uppercase font-semibold block">Pressure Score</span>
-                <span className="text-sm font-black font-mono text-[#EA1A85]">{player.clutchPressureRating}</span>
+                <span className="text-[10px] text-slate-400 uppercase font-semibold block">Pressure SR</span>
+                <span className="text-sm font-black font-mono text-emerald-400">{player.eb_sr_press}</span>
               </div>
               <div className="rounded-lg bg-slate-900/60 p-2 border border-slate-800">
-                <span className="text-[10px] text-slate-400 uppercase font-semibold block">{player.runsOrWickets.includes('Wickets') ? 'Economy Rate' : 'Strike Rate'}</span>
-                <span className="text-sm font-black font-mono text-[#F59E0B]">{player.strikeRateOrEconomy}</span>
+                <span className="text-[10px] text-slate-400 uppercase font-semibold block">Pressure Avg</span>
+                <span className="text-sm font-black font-mono text-white">{player.eb_avg_press}</span>
               </div>
               <div className="rounded-lg bg-slate-900/60 p-2 border border-slate-800">
-                <span className="text-[10px] text-slate-400 uppercase font-semibold block">Boundary %</span>
-                <span className="text-sm font-black font-mono text-emerald-400">{player.boundaryPercentage}%</span>
+                <span className="text-[10px] text-slate-400 uppercase font-semibold block">Pressure Econ</span>
+                <span className="text-sm font-black font-mono text-[#38BDF8]">{player.eb_econ_press}</span>
               </div>
               <div className="rounded-lg bg-slate-900/60 p-2 border border-slate-800">
                 <span className="text-[10px] text-slate-400 uppercase font-semibold block">Rec. Max Bid</span>
-                <span className="text-sm font-black font-mono text-white">₹{player.recommendedMaxBid.toFixed(2)} Cr</span>
+                <span className="text-sm font-black font-mono text-[#F59E0B]">
+                  {player.recommendedMaxBid ? `₹${player.recommendedMaxBid.toFixed(2)} Cr` : 'N/A'}
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Rajasthan Royals Strategic Fit */}
-          <div className="rounded-xl border border-[#EA1A85]/30 bg-gradient-to-r from-[#EA1A85]/10 via-[#1E293B] to-[#1E293B] p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#EA1A85]">
-              <Target className="h-4 w-4" />
-              RR Strategic Fit & Tactical Role
+          {/* RR Tactical Squad Fit (if mapped) */}
+          {player.targetRole && (
+            <div className="rounded-xl border border-[#EA1A85]/30 bg-gradient-to-r from-[#EA1A85]/10 via-[#1E293B] to-[#1E293B] p-4 shadow-sm">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#EA1A85]">
+                <Target className="h-4 w-4" />
+                Target Squad Gap Assignment
+              </div>
+              <div className="mt-2 flex items-center justify-between">
+                <span className="text-sm font-bold text-white">{player.targetRole}</span>
+                <span className="text-xs font-mono font-bold text-[#F59E0B]">{player.tier}</span>
+              </div>
             </div>
-            <p className="mt-2 text-xs text-slate-200 leading-relaxed">
-              {scoutingReport.rajasthanRoyalsFit}
-            </p>
-            <div className="mt-3 flex items-center gap-2">
-              <span className="text-[11px] font-semibold text-slate-400">Target Role Designation:</span>
-              <span className="rounded-md bg-[#EA1A85]/20 px-2 py-0.5 text-xs font-bold text-white border border-[#EA1A85]/40">
-                {scoutingReport.projectedRole}
-              </span>
+          )}
+
+          {/* HL-PRS v7 Deductions & Bonuses Strip */}
+          <div className="rounded-xl border border-slate-800 bg-[#0F172A] p-4 space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              HL-PRS v7 Forensic Deductions & Bonuses
+            </h4>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+              <div className="rounded-lg bg-slate-900 p-2 border border-slate-800">
+                <span className="text-[10px] text-slate-400 block uppercase">KO Flop (-P_flop)</span>
+                <span className={`font-mono font-bold ${player.p_flop > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                  {player.p_flop > 0 ? `-${player.p_flop}` : '0.0 (Clean)'}
+                </span>
+              </div>
+              <div className="rounded-lg bg-slate-900 p-2 border border-slate-800">
+                <span className="text-[10px] text-slate-400 block uppercase">Stat-Pad (-P_pad)</span>
+                <span className={`font-mono font-bold ${player.p_pad > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                  {player.p_pad > 0 ? `-${player.p_pad}` : '0.0 (Clean)'}
+                </span>
+              </div>
+              <div className="rounded-lg bg-slate-900 p-2 border border-slate-800">
+                <span className="text-[10px] text-slate-400 block uppercase">Volume (+B_vol)</span>
+                <span className="font-mono font-bold text-emerald-400">
+                  +{player.b_vol}
+                </span>
+              </div>
+              <div className="rounded-lg bg-slate-900 p-2 border border-slate-800">
+                <span className="text-[10px] text-slate-400 block uppercase">Pedigree (+B_ped)</span>
+                <span className="font-mono font-bold text-blue-400">
+                  +{player.b_pedigree}
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* Analyst Summary */}
+          {/* Tactical Analyst Notes */}
           <div className="space-y-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
               <ShieldCheck className="h-4 w-4 text-blue-400" />
-              Lead Scout Analyst Summary
-            </h3>
+              Scout & Model Technical Summary
+            </h4>
             <p className="rounded-xl border border-slate-800 bg-[#1E293B]/60 p-4 text-xs text-slate-300 leading-relaxed">
-              {scoutingReport.analystSummary}
+              {player.tacticalNotes}
             </p>
           </div>
 
-          {/* Technical Strengths & Development Areas */}
+          {/* Strengths & Weaknesses */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Strengths */}
             <div className="rounded-xl border border-emerald-900/40 bg-emerald-950/10 p-4 space-y-2">
               <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
                 <CheckCircle2 className="h-4 w-4" />
                 Technical Strengths
               </h4>
-              <ul className="space-y-2 text-xs text-slate-300">
-                {scoutingReport.technicalStrengths.map((item, idx) => (
-                  <li key={idx} className="flex items-start gap-2">
-                    <span className="text-emerald-400 font-bold mt-0.5">•</span>
-                    <span>{item}</span>
+              <ul className="space-y-1.5 text-xs text-slate-300">
+                {player.strengths.map((s, idx) => (
+                  <li key={idx} className="flex items-start gap-1.5">
+                    <span className="text-emerald-400 font-bold">•</span>
+                    <span>{s}</span>
                   </li>
                 ))}
               </ul>
             </div>
 
-            {/* Areas of Development */}
             <div className="rounded-xl border border-amber-900/40 bg-amber-950/10 p-4 space-y-2">
               <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
                 <AlertTriangle className="h-4 w-4" />
-                Areas of Development
+                Scouting Caution Areas
               </h4>
-              <ul className="space-y-2 text-xs text-slate-300">
-                {scoutingReport.areasOfDevelopment.map((item, idx) => (
-                  <li key={idx} className="flex items-start gap-2">
-                    <span className="text-amber-400 font-bold mt-0.5">•</span>
-                    <span>{item}</span>
+              <ul className="space-y-1.5 text-xs text-slate-300">
+                {player.weaknesses.map((w, idx) => (
+                  <li key={idx} className="flex items-start gap-1.5">
+                    <span className="text-amber-400 font-bold">•</span>
+                    <span>{w}</span>
                   </li>
                 ))}
               </ul>
-            </div>
-          </div>
-
-          {/* Metrics Radar / Benchmark Bars */}
-          <div className="space-y-3 rounded-xl border border-slate-800 bg-[#1E293B]/70 p-4">
-            <div className="flex items-center justify-between">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                <BarChart3 className="h-4 w-4 text-[#F59E0B]" />
-                Advanced Metric Percentiles vs Uncapped Benchmark
-              </h4>
-              <span className="text-[10px] text-slate-500">Benchmark = 60</span>
-            </div>
-
-            <div className="space-y-3 pt-2">
-              {scoutingReport.metricsRadar.map((metric, idx) => (
-                <div key={idx} className="space-y-1">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-300 font-medium">{metric.label}</span>
-                    <span className="font-mono font-bold text-white">
-                      {metric.value} <span className="text-slate-500 text-[10px]">/ 100</span>
-                    </span>
-                  </div>
-                  <div className="relative h-2 w-full rounded-full bg-slate-800 overflow-hidden">
-                    {/* Benchmark marker */}
-                    <div
-                      className="absolute top-0 bottom-0 w-0.5 bg-slate-500 z-10"
-                      style={{ left: `${metric.benchmark}%` }}
-                      title={`Benchmark: ${metric.benchmark}`}
-                    />
-                    {/* Value bar */}
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-blue-500 via-[#EA1A85] to-[#F59E0B]"
-                      style={{ width: `${metric.value}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* High-Pressure Match Highlights */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-              <Flame className="h-4 w-4 text-[#EA1A85]" />
-              Signature High-Leverage Performances
-            </h4>
-            
-            <div className="space-y-2.5">
-              {scoutingReport.recentHighlights.map((hl, idx) => (
-                <div key={idx} className="rounded-xl border border-slate-800 bg-[#0F172A]/80 p-3.5 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white">{hl.match}</span>
-                    <span className="rounded bg-slate-800 px-2 py-0.5 text-[10px] text-slate-400 font-semibold">
-                      {hl.tournament}
-                    </span>
-                  </div>
-                  <p className="text-xs font-mono font-semibold text-[#F59E0B]">{hl.performance}</p>
-                  <p className="text-[11px] text-slate-400">{hl.context}</p>
-                </div>
-              ))}
             </div>
           </div>
 
@@ -261,10 +232,9 @@ export default function PlayerScoutingDrawer({
         {/* Footer Actions */}
         <div className="border-t border-slate-800 bg-[#0F172A] p-4 flex items-center justify-between">
           <div>
-            <span className="text-[10px] uppercase font-bold text-slate-400 block">Recommended Bid Ceiling</span>
+            <span className="text-[10px] uppercase font-bold text-slate-400 block">Auction Valuation Cap</span>
             <span className="text-base font-black font-mono text-[#F59E0B]">
-              ₹{player.recommendedMaxBid.toFixed(2)} Cr
-              <span className="text-xs text-slate-500 font-normal ml-1"> (Base: ₹{player.basePrice.toFixed(2)} Cr)</span>
+              {player.recommendedMaxBid ? `₹${player.recommendedMaxBid.toFixed(2)} Cr` : 'Player Under Contract'}
             </span>
           </div>
 
@@ -276,7 +246,7 @@ export default function PlayerScoutingDrawer({
                 : 'bg-gradient-to-r from-[#EA1A85] to-[#D01474] text-white hover:brightness-110 shadow-lg shadow-[#EA1A85]/30'
             }`}
           >
-            {isSelectedForAuction ? 'Remove from Simulator' : 'Target for RR Squad (+)'}
+            {isSelectedForAuction ? 'Remove from Simulator' : 'Add to Target Buys (+)'}
           </button>
         </div>
 

@@ -16,11 +16,11 @@ import {
   Cell,
   ReferenceLine,
 } from 'recharts';
-import { Player, UNCAPPED_PLAYERS, SQUAD_GAPS } from '@/data/players';
+import { HLPRSPlayer, RR_AUCTION_TARGET_BOARD, RR_5_SQUAD_GAPS } from '@/data/players';
 import { Activity, BarChart3 } from 'lucide-react';
 
 interface ScoutingChartsProps {
-  onSelectPlayer: (player: Player) => void;
+  onSelectPlayer: (player: HLPRSPlayer) => void;
   selectedPlayerIds: string[];
 }
 
@@ -37,42 +37,41 @@ export default function ScoutingCharts({
   selectedPlayerIds,
 }: ScoutingChartsProps) {
   const isMounted = useIsClient();
-  const [chartMode, setChartMode] = useState<'batters' | 'bowlers' | 'all'>('all');
+  const [chartMode, setChartMode] = useState<'all' | 'released' | 'uncapped'>('all');
 
-  // Format data for Scatter Plot
-  const scatterData = UNCAPPED_PLAYERS.map((p) => {
-    const isBowler = p.runsOrWickets.includes('Wickets');
+  const scatterData = RR_AUCTION_TARGET_BOARD.map((p) => {
+    const isBowler = ['Domestic/Overseas Death Pacer', 'Mystery Wrist Spinner / Attacking Leg-Spinner'].includes(p.targetRole || '');
+    const isReleased = p.contractStatus?.includes('Released');
+    
     return {
-      id: p.id,
-      name: p.name,
-      role: p.role,
+      id: p.player_id,
+      name: p.player_name,
+      role: p.targetRole || p.role,
+      nationality: p.nationality,
+      isReleased,
       isBowler,
-      team: p.domesticTeam,
-      // X-axis: Strike rate (for batters) or Inverted Economy (for bowlers)
-      statValue: p.strikeRateOrEconomy,
-      // Y-axis: Pressure Rating (0 - 100)
-      pressureRating: p.clutchPressureRating,
-      boundaryPct: p.boundaryPercentage,
-      recBid: p.recommendedMaxBid,
+      // Stat value: Pressure SR for batters, Inverted Economy for bowlers
+      statValue: isBowler ? p.eb_econ_press : p.eb_sr_press,
+      hl_prs_score: p.hl_prs_score,
+      recBid: p.recommendedMaxBid || 2.0,
       originalPlayer: p,
-      // Dot size based on Rec Max Bid
-      zSize: p.recommendedMaxBid * 30,
+      zSize: (p.recommendedMaxBid || 2.0) * 45,
     };
   }).filter((p) => {
-    if (chartMode === 'batters') return !p.isBowler;
-    if (chartMode === 'bowlers') return p.isBowler;
+    if (chartMode === 'released') return p.isReleased;
+    if (chartMode === 'uncapped') return !p.isReleased;
     return true;
   });
 
-  // Role Gap Bar Chart Data
-  const squadGapChartData = SQUAD_GAPS.map((gap) => {
+  const squadGapChartData = RR_5_SQUAD_GAPS.map((gap) => {
+    const availableTargets = RR_AUCTION_TARGET_BOARD.filter(p => p.targetRole?.includes(gap.gapName.split('. ')[1]) || false);
+    const selectedCount = availableTargets.filter(p => selectedPlayerIds.includes(p.player_id)).length;
+    
     return {
-      roleCategory: gap.roleCategory,
-      currentStrength: gap.currentStrength,
-      targetGoal: 90, // ideal benchmark
-      gapDeficit: 90 - gap.currentStrength,
-      shortlistedCount: gap.shortlistedCount,
-      urgency: gap.urgencyLevel,
+      gapName: gap.gapName.split('. ')[1] || gap.gapName,
+      availableTargets: availableTargets.length,
+      selectedTargets: selectedCount,
+      urgency: gap.urgency,
     };
   });
 
@@ -80,10 +79,10 @@ export default function ScoutingCharts({
     return (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[400px]">
         <div className="h-[400px] rounded-xl border border-slate-800 bg-[#1E293B]/70 animate-pulse flex items-center justify-center text-slate-500 text-xs">
-          Loading Scouting Scatter Matrix...
+          Loading HL-PRS v7 Scatter Matrix...
         </div>
         <div className="h-[400px] rounded-xl border border-slate-800 bg-[#1E293B]/70 animate-pulse flex items-center justify-center text-slate-500 text-xs">
-          Loading Squad Gap Analysis...
+          Loading RR 5 Squad Gap Breakdown...
         </div>
       </div>
     );
@@ -93,21 +92,20 @@ export default function ScoutingCharts({
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
-        {/* CHART 1: Scatter Plot - Performance vs Pressure Rating */}
+        {/* CHART 1: Scatter Plot - Performance vs HL-PRS v7 */}
         <div className="rounded-xl border border-slate-800 bg-[#1E293B]/80 p-5 shadow-xl flex flex-col justify-between">
           <div>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
               <div>
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
                   <Activity className="h-4 w-4 text-[#EA1A85]" />
-                  Clutch Pressure Index vs. Strike Rate / Economy
+                  HL-PRS v7 Score vs. Pressure Performance Metric
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Identifies undervalued high-leverage gems in top-right quadrant
+                  Rajasthan Royals 14 Auction Targets (Released Nov 17 + Uncontracted Gems)
                 </p>
               </div>
 
-              {/* Chart Filter Buttons */}
               <div className="flex items-center rounded-lg border border-slate-700 bg-slate-900/90 p-0.5 text-xs">
                 <button
                   onClick={() => setChartMode('all')}
@@ -115,36 +113,36 @@ export default function ScoutingCharts({
                     chartMode === 'all' ? 'bg-[#EA1A85] text-white font-bold' : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  All (10)
+                  All (14)
                 </button>
                 <button
-                  onClick={() => setChartMode('batters')}
+                  onClick={() => setChartMode('released')}
                   className={`px-2 py-1 rounded-md transition-colors ${
-                    chartMode === 'batters' ? 'bg-[#EA1A85] text-white font-bold' : 'text-slate-400 hover:text-white'
+                    chartMode === 'released' ? 'bg-[#EA1A85] text-white font-bold' : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  Batters
+                  Released (8)
                 </button>
                 <button
-                  onClick={() => setChartMode('bowlers')}
+                  onClick={() => setChartMode('uncapped')}
                   className={`px-2 py-1 rounded-md transition-colors ${
-                    chartMode === 'bowlers' ? 'bg-[#EA1A85] text-white font-bold' : 'text-slate-400 hover:text-white'
+                    chartMode === 'uncapped' ? 'bg-[#EA1A85] text-white font-bold' : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  Bowlers
+                  Uncontracted (6)
                 </button>
               </div>
             </div>
 
-            {/* Quadrant Legend Strip */}
+            {/* Quadrant Legend */}
             <div className="grid grid-cols-2 gap-2 my-3 text-[11px] bg-slate-900/60 p-2.5 rounded-lg border border-slate-800">
               <div className="flex items-center gap-1.5 text-emerald-400 font-medium">
                 <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                <span>Top Right: Elite High-Leverage Gems</span>
+                <span>Top-Right: High-Leverage Elite Gems</span>
               </div>
               <div className="flex items-center gap-1.5 text-[#F59E0B] font-medium">
                 <span className="h-2 w-2 rounded-full bg-[#F59E0B]" />
-                <span>Top Left: Clutch Specialists & Anchors</span>
+                <span>Bubble Size = Rec. Max Bid (₹ Cr)</span>
               </div>
             </div>
 
@@ -157,13 +155,12 @@ export default function ScoutingCharts({
                   <XAxis
                     type="number"
                     dataKey="statValue"
-                    name={chartMode === 'bowlers' ? 'Economy Rate' : 'Strike Rate / Economy'}
-                    domain={chartMode === 'bowlers' ? [6, 9] : ['auto', 'auto']}
+                    name="Performance Metric"
+                    domain={['auto', 'auto']}
                     stroke="#94A3B8"
                     fontSize={11}
-                    tickFormatter={(v) => `${v}`}
                     label={{
-                      value: chartMode === 'bowlers' ? 'Economy Rate (RPO)' : 'Strike Rate (Batters) / Economy (Bowlers)',
+                      value: 'Pressure Metric (SR for Batters / Econ for Bowlers)',
                       position: 'bottom',
                       offset: 0,
                       fill: '#94A3B8',
@@ -173,13 +170,13 @@ export default function ScoutingCharts({
                   
                   <YAxis
                     type="number"
-                    dataKey="pressureRating"
-                    name="Pressure Rating"
-                    domain={[86, 96]}
+                    dataKey="hl_prs_score"
+                    name="HL-PRS v7 Score"
+                    domain={[40, 95]}
                     stroke="#94A3B8"
                     fontSize={11}
                     label={{
-                      value: 'Clutch Pressure Score (0-100)',
+                      value: 'HL-PRS v7 Score (0-100)',
                       angle: -90,
                       position: 'insideLeft',
                       fill: '#94A3B8',
@@ -187,9 +184,9 @@ export default function ScoutingCharts({
                     }}
                   />
 
-                  <ZAxis type="number" dataKey="zSize" range={[120, 420]} name="Max Bid" />
+                  <ZAxis type="number" dataKey="zSize" range={[120, 500]} name="Max Bid" />
 
-                  <ReferenceLine y={90} stroke="#EA1A85" strokeDasharray="4 4" label={{ value: 'Target 90+ PI', fill: '#EA1A85', fontSize: 10, position: 'right' }} />
+                  <ReferenceLine y={65} stroke="#EA1A85" strokeDasharray="4 4" label={{ value: 'Priority Target Threshold (65+)', fill: '#EA1A85', fontSize: 10, position: 'right' }} />
 
                   <Tooltip
                     content={({ active, payload }) => {
@@ -203,22 +200,19 @@ export default function ScoutingCharts({
                                 #{data.originalPlayer.rank}
                               </span>
                             </div>
-                            <p className="text-slate-400 text-[11px]">{data.role} • {data.team}</p>
+                            <p className="text-slate-400 text-[11px]">{data.role} • {data.nationality}</p>
                             <div className="pt-2 border-t border-slate-800 space-y-0.5 font-mono text-[11px]">
                               <p className="text-emerald-400">
-                                Pressure Score: <strong>{data.pressureRating} / 100</strong>
+                                HL-PRS v7 Score: <strong>{data.hl_prs_score} / 100</strong>
                               </p>
                               <p className="text-white">
-                                {data.isBowler ? 'Economy' : 'Strike Rate'}: <strong>{data.statValue}</strong>
+                                {data.isBowler ? 'Pressure Econ' : 'Pressure SR'}: <strong>{data.statValue}</strong>
                               </p>
                               <p className="text-[#F59E0B]">
-                                Boundary Rate: <strong>{data.boundaryPct}%</strong>
-                              </p>
-                              <p className="text-[#EA1A85]">
                                 Rec. Max Bid: <strong>₹{data.recBid.toFixed(2)} Cr</strong>
                               </p>
                             </div>
-                            <p className="text-[10px] text-slate-500 pt-1 italic">Click to view full dossier</p>
+                            <p className="text-[10px] text-slate-500 pt-1 italic">Click to view HL-PRS dossier</p>
                           </div>
                         );
                       }
@@ -227,12 +221,12 @@ export default function ScoutingCharts({
                   />
 
                   <Scatter
-                    name="Uncapped Shortlist"
+                    name="RR Target Candidates"
                     data={scatterData}
                     onClick={(entry) => {
                       if (entry && typeof entry === 'object') {
-                        const payload = 'payload' in entry ? (entry as { payload?: { originalPlayer?: Player } }).payload : undefined;
-                        const originalPlayer = payload?.originalPlayer || ('originalPlayer' in entry ? (entry as { originalPlayer?: Player }).originalPlayer : undefined);
+                        const payload = 'payload' in entry ? (entry as { payload?: { originalPlayer?: HLPRSPlayer } }).payload : undefined;
+                        const originalPlayer = payload?.originalPlayer || ('originalPlayer' in entry ? (entry as { originalPlayer?: HLPRSPlayer }).originalPlayer : undefined);
                         if (originalPlayer) {
                           onSelectPlayer(originalPlayer);
                         }
@@ -245,7 +239,7 @@ export default function ScoutingCharts({
                       return (
                         <Cell
                           key={`cell-${index}`}
-                          fill={isSelected ? '#EA1A85' : entry.isBowler ? '#38BDF8' : '#F59E0B'}
+                          fill={isSelected ? '#EA1A85' : entry.isReleased ? '#F59E0B' : '#38BDF8'}
                           stroke={isSelected ? '#FFFFFF' : '#0F172A'}
                           strokeWidth={isSelected ? 2 : 1}
                         />
@@ -259,29 +253,28 @@ export default function ScoutingCharts({
 
           <div className="mt-2 text-[11px] text-slate-400 flex items-center justify-between pt-2 border-t border-slate-800">
             <span className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#EA1A85]" /> Target Shortlist
-              <span className="h-2.5 w-2.5 rounded-full bg-[#38BDF8] ml-2" /> Pacers/Spinners
-              <span className="h-2.5 w-2.5 rounded-full bg-[#F59E0B] ml-2" /> Batters/Finishers
+              <span className="h-2.5 w-2.5 rounded-full bg-[#EA1A85]" /> Selected Target
+              <span className="h-2.5 w-2.5 rounded-full bg-[#F59E0B] ml-2" /> Released Stars
+              <span className="h-2.5 w-2.5 rounded-full bg-[#38BDF8] ml-2" /> Uncontracted Gems
             </span>
-            <span className="text-slate-500 font-mono">Bubble size = Rec. Max Bid</span>
           </div>
         </div>
 
-        {/* CHART 2: Bar Chart - Role-Wise Squad Gap Coverage for Rajasthan Royals */}
+        {/* CHART 2: Bar Chart - RR 5 Squad Gap Fulfillment */}
         <div className="rounded-xl border border-slate-800 bg-[#1E293B]/80 p-5 shadow-xl flex flex-col justify-between">
           <div>
             <div className="pb-3 border-b border-slate-800">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
                   <BarChart3 className="h-4 w-4 text-[#F59E0B]" />
-                  RR Squad Gap vs. Shortlisted Coverage Ahead of IPL 2027
+                  RR 5 Squad Gaps Ahead of IPL 2027
                 </h3>
-                <span className="rounded-full bg-rose-500/15 border border-rose-500/30 px-2 py-0.5 text-[10px] font-bold text-rose-400">
-                  Critical Deficits
+                <span className="rounded-full bg-[#EA1A85]/15 border border-[#EA1A85]/30 px-2 py-0.5 text-[10px] font-bold text-[#EA1A85]">
+                  HL-PRS v7 Mapping
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Current Rajasthan Royals roster depth benchmarked against target strength (90)
+                Available vs. Simulated Targets per tactical squad deficit
               </p>
             </div>
 
@@ -297,18 +290,17 @@ export default function ScoutingCharts({
                   
                   <XAxis
                     type="number"
-                    domain={[0, 100]}
+                    domain={[0, 5]}
                     stroke="#94A3B8"
                     fontSize={11}
-                    tickFormatter={(v) => `${v}%`}
                   />
                   
                   <YAxis
                     type="category"
-                    dataKey="roleCategory"
+                    dataKey="gapName"
                     stroke="#CBD5E1"
-                    fontSize={11}
-                    width={130}
+                    fontSize={10}
+                    width={150}
                     tick={{ fill: '#E2E8F0' }}
                   />
 
@@ -318,22 +310,14 @@ export default function ScoutingCharts({
                         const data = payload[0].payload as typeof squadGapChartData[0];
                         return (
                           <div className="rounded-xl border border-slate-700 bg-[#0F172A] p-3 shadow-2xl text-xs space-y-1">
-                            <p className="font-bold text-white text-sm">{data.roleCategory}</p>
-                            <p className="text-slate-400">
-                              Urgency Level:{' '}
-                              <span className={`font-bold ${data.urgency === 'Critical' ? 'text-rose-400' : 'text-amber-400'}`}>
-                                {data.urgency}
-                              </span>
-                            </p>
+                            <p className="font-bold text-white text-sm">{data.gapName}</p>
+                            <p className="text-slate-400">Urgency: <strong className="text-[#EA1A85]">{data.urgency}</strong></p>
                             <div className="pt-2 border-t border-slate-800 space-y-0.5 font-mono text-[11px]">
-                              <p className="text-slate-300">
-                                Current Depth: <strong>{data.currentStrength}%</strong>
+                              <p className="text-blue-400">
+                                Available Candidates: <strong>{data.availableTargets}</strong>
                               </p>
-                              <p className="text-rose-400">
-                                Deficit to Benchmark: <strong>-{data.gapDeficit}%</strong>
-                              </p>
-                              <p className="text-[#EA1A85]">
-                                Shortlisted Talents Available: <strong>{data.shortlistedCount} Players</strong>
+                              <p className="text-emerald-400">
+                                Currently Selected in Cart: <strong>{data.selectedTargets}</strong>
                               </p>
                             </div>
                           </div>
@@ -349,15 +333,15 @@ export default function ScoutingCharts({
                   />
 
                   <Bar
-                    dataKey="currentStrength"
-                    name="Current Squad Strength (%)"
+                    dataKey="availableTargets"
+                    name="Available Shortlisted Candidates"
                     fill="#38BDF8"
                     radius={[0, 4, 4, 0]}
                   />
 
                   <Bar
-                    dataKey="gapDeficit"
-                    name="Scouting Target Deficit (%)"
+                    dataKey="selectedTargets"
+                    name="Active Targets Selected"
                     fill="#EA1A85"
                     radius={[0, 4, 4, 0]}
                   />
@@ -367,8 +351,8 @@ export default function ScoutingCharts({
           </div>
 
           <div className="mt-2 text-[11px] text-slate-400 flex items-center justify-between pt-2 border-t border-slate-800">
-            <span>Domestic Death Pacer & Power Finisher are <strong>Critical Gaps</strong></span>
-            <span className="text-emerald-400 font-medium">100% covered in Top 10 Shortlist</span>
+            <span>Redundant openers and left-arm orthodox spinners explicitly excluded</span>
+            <span className="text-emerald-400 font-medium">100% gap coverage possible</span>
           </div>
         </div>
 

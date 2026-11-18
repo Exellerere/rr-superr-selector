@@ -1,808 +1,1673 @@
 /**
- * RR SupeRR Selector — IPL 2027 Scouting & Auction Engine
- * Decoupled Data Store
+ * RR SupeRR Selector — IPL 2027 Talent Scouting & Auction Engine
+ * Powered by HL-PRS v7 (Hierarchical Leverage-Weighted Pressure Rating System)
  * 
- * --------------------------------------------------------------------------
- * HOW TO SWAP WITH YOUR REAL CSV / JSON DATASET:
- * 1. Export your Python / R scouting model output to JSON or CSV.
- * 2. Ensure each player object adheres to the `Player` interface below.
- * 3. Replace the `UNCAPPED_PLAYERS` array with your parsed records or load
- *    from an external API route (`/api/players`).
- * 4. Adjust the weights in `SCORING_METHODOLOGY` if your machine learning
- *    pipeline uses custom hyperparameters.
- * --------------------------------------------------------------------------
+ * T20-ONLY STRICT ENGINE
+ * Evaluated across 7,824 active players from official relational datasets:
+ * - players.csv
+ * - player_match_stats.csv
+ * - matches.csv
+ * - competitions.csv
+ * - player_competition_team_mapping.csv
  */
 
-export type PlayerRole = 'Top-Order Batter' | 'Middle-Order Finisher' | 'All-Rounder' | 'Wicketkeeper-Batter' | 'Pace Bowler' | 'Wrist Spinner' | 'Finger Spinner';
-
-export interface PlayerMetric {
-  label: string;
-  value: number; // 0 to 100
-  benchmark: number; // average uncapped benchmark
-}
-
-export interface PlayerMatchHighlight {
-  match: string;
-  tournament: string;
-  performance: string;
-  context: string;
-}
-
-export interface ScoutingReport {
-  analystSummary: string;
-  technicalStrengths: string[];
-  areasOfDevelopment: string[];
-  rajasthanRoyalsFit: string;
-  projectedRole: string;
-  metricsRadar: PlayerMetric[];
-  recentHighlights: PlayerMatchHighlight[];
-  scoutRating: number; // out of 10
-}
-
-export interface Player {
-  id: string;
+export interface HLPRSPlayer {
   rank: number;
-  name: string;
-  age: number;
-  role: PlayerRole;
-  domesticTeam: string;
-  battingStyle: string;
-  bowlingStyle?: string;
-  matchesPlayed: number;
-  
-  // Batting / Bowling core numbers
-  runsOrWickets: string; // e.g. "482 Runs" or "22 Wickets"
-  strikeRateOrEconomy: number; // Strike Rate for batters (e.g. 168.4) or Economy for bowlers (e.g. 7.15)
-  boundaryPercentage: number; // % of runs in boundaries or boundary balls conceded %
-  deathPowerplayStat: string; // e.g. "Death SR: 204.8" or "PP Econ: 6.20"
-  
-  // Analytics & Machine Learning Model Scores
-  clutchPressureRating: number; // 0 - 100 Pressure Index Score
-  winProbabilityAdded: number; // WPA per match
-  dotBallPressureRatio: number; // %
-  recommendedMaxBid: number; // in INR Crores (₹ Cr)
-  basePrice: number; // in INR Crores (₹ Cr), typically 0.20 or 0.30 Cr
-  
-  // Squad gap tagging
-  primaryGapCovered: 'Finisher & Death Power' | 'Domestic Death Pacer' | 'Mystery Wrist Spinner' | 'Middle-Order Anchor/Rotator' | 'Powerplay Exploiter' | 'Dynamic Wicketkeeper';
-  
-  // Deep Scouting Dossier
-  scoutingReport: ScoutingReport;
+  player_id: string;
+  player_name: string;
+  nationality: string;
+  role: string;
+  targetRole?: string;
+  tier?: string;
+  contractStatus?: string;
+  recommendedMaxBid?: number; // in INR Crores (₹ Cr)
+  total_matches: number;
+  total_runs: number;
+  total_balls: number;
+  career_sr: string;
+  total_wkts: number;
+  legal_overs: string;
+  career_econ: string;
+  n_press: number;
+  eb_avg_press: number;
+  eb_sr_press: number;
+  eb_econ_press: number;
+  eb_bowlsr_press: number;
+  p_flop: number;
+  p_pad: number;
+  b_vol: number;
+  b_pedigree: number;
+  hl_prs_score: number;
+  is_high_baseline?: boolean;
+  tacticalNotes: string;
+  strengths: string[];
+  weaknesses: string[];
 }
 
-export interface SquadGap {
-  roleCategory: string;
-  currentStrength: number; // 0 - 100
-  urgencyLevel: 'Critical' | 'High' | 'Moderate';
-  targetCount: number;
-  shortlistedCount: number;
-  description: string;
-  idealProfile: string;
-}
-
-export interface ExecutiveKPIs {
-  totalDomesticPlayersAnalyzed: number;
-  shortlistCount: number;
-  avgPressureImpactScore: number;
-  targetAuctionPurseAllocation: number; // ₹ Cr
-  totalPurseBudget: number; // ₹ Cr (RR total auction purse)
-  historicalRetentionCount: number;
-  overseasSlotsRemaining: number;
-  totalSlotsRemaining: number;
-}
-
-export const EXECUTIVE_KPIS: ExecutiveKPIs = {
-  totalDomesticPlayersAnalyzed: 842,
-  shortlistCount: 10,
-  avgPressureImpactScore: 89.6,
-  targetAuctionPurseAllocation: 16.80,
-  totalPurseBudget: 34.50,
-  historicalRetentionCount: 15,
-  overseasSlotsRemaining: 3,
-  totalSlotsRemaining: 8,
-};
-
-export const SQUAD_GAPS: SquadGap[] = [
-  {
-    roleCategory: 'Finisher & Death Power',
-    currentStrength: 52,
-    urgencyLevel: 'Critical',
-    targetCount: 2,
-    shortlistedCount: 3,
-    description: 'Post-Shimron Hetmyer acceleration depth. Need domestic power hitters capable of striking 190+ from ball 1 in overs 16-20.',
-    idealProfile: 'Right-handed or left-handed brute with bat speed > 135 km/h and high boundary rate against high-pace hard lengths.'
-  },
-  {
-    roleCategory: 'Domestic Death Pacer',
-    currentStrength: 46,
-    urgencyLevel: 'Critical',
-    targetCount: 2,
-    shortlistedCount: 2,
-    description: 'Death overs specialist bowling accurate wide yorkers and slow dipping off-cutters at the Sawai Mansingh Stadium.',
-    idealProfile: '140+ kph bowler with pinpoint yorker execution (>35% yorker frequency in death overs) under pressure.'
-  },
-  {
-    roleCategory: 'Mystery Wrist Spinner',
-    currentStrength: 64,
-    urgencyLevel: 'High',
-    targetCount: 1,
-    shortlistedCount: 2,
-    description: 'Long-term succession plan for Yuzvendra Chahal/Ashwin archetype. Must attack middle overs (7-15) on Jaipur track.',
-    idealProfile: 'Aggressive googly/slider bowler with deception against LHB and sub-7.50 economy when batsmen are charging.'
-  },
-  {
-    roleCategory: 'Middle-Order Anchor/Rotator',
-    currentStrength: 72,
-    urgencyLevel: 'Moderate',
-    targetCount: 1,
-    shortlistedCount: 1,
-    description: 'Stabilizer for 20/3 collapse scenarios who rotates strike against spin at 135+ SR without consuming dot balls.',
-    idealProfile: 'Technically sound stroke-maker with low dot-ball % (<28%) against finger spin.'
-  },
-  {
-    roleCategory: 'Dynamic Wicketkeeper',
-    currentStrength: 68,
-    urgencyLevel: 'Moderate',
-    targetCount: 1,
-    shortlistedCount: 1,
-    description: 'Backup gloveman behind Sanju Samson with versatile entry point (3 to 6) and 360-degree sweep capability.',
-    idealProfile: 'Agile keeper with swift stumping reflexes and innovative lap/ramp shots against express pace.'
-  },
-  {
-    roleCategory: 'Powerplay Exploiter',
-    currentStrength: 78,
-    urgencyLevel: 'Moderate',
-    targetCount: 1,
-    shortlistedCount: 1,
-    description: 'High-intent boundary seeker who clears infield during first 6 overs to maximize field restrictions.',
-    idealProfile: 'Fearless opener with 160+ PP strike rate and dominant pull shot against short pitched bowling.'
-  }
-];
-
-export const UNCAPPED_PLAYERS: Player[] = [
-  {
-    id: 'rr-scout-01',
-    rank: 1,
-    name: 'Priyansh Arya',
-    age: 23,
-    role: 'Top-Order Batter',
-    domesticTeam: 'Delhi / DPL',
-    battingStyle: 'Left-Hand Bat',
-    matchesPlayed: 24,
-    runsOrWickets: '812 Runs',
-    strikeRateOrEconomy: 174.2,
-    boundaryPercentage: 74.8,
-    deathPowerplayStat: 'PP SR: 182.6',
-    clutchPressureRating: 94.8,
-    winProbabilityAdded: 0.28,
-    dotBallPressureRatio: 21.4,
-    recommendedMaxBid: 4.80,
-    basePrice: 0.30,
-    primaryGapCovered: 'Powerplay Exploiter',
-    scoutingReport: {
-      analystSummary: 'Explosive left-handed opener who dismantled top domestic bowling attacks in the Delhi Premier League and SMAT. Possesses devastating bat swing through the line and scored six sixes in an over. Perfectly matches Rajasthan Royals aggressive intent philosophy at the top alongside Jaiswal and Samson.',
-      technicalStrengths: [
-        'Elite bat speed against 140+ kph express pace with quick front-foot transfer',
-        'Exceptional boundary percentage (74.8% of runs scored in boundaries)',
-        'Extremely low dot-ball percentage in field-restriction powerplay overs (21.4%)',
-        'Strong back-foot weight transfer to demolish short ball over mid-wicket'
-      ],
-      areasOfDevelopment: [
-        'Vulnerability to sharp incoming inswingers from left-arm quicks in the first 6 balls',
-        'Patience against disciplined wide-line spin traps outside off-stump'
-      ],
-      rajasthanRoyalsFit: 'Provides a like-for-like southpaw fireworks option. Can open or float at #3 to maintain ultra-high run-rates at Sawai Mansingh Stadium.',
-      projectedRole: 'Enforcer Opener / Dynamic Powerplay Striker',
-      scoutRating: 9.6,
-      metricsRadar: [
-        { label: 'Powerplay Strike Rate', value: 95, benchmark: 68 },
-        { label: 'Boundary Frequency', value: 94, benchmark: 62 },
-        { label: 'High-Pace Dominance', value: 91, benchmark: 59 },
-        { label: 'Pressure Index (WPA)', value: 95, benchmark: 65 },
-        { label: 'Dot Ball Suppression', value: 89, benchmark: 60 }
-      ],
-      recentHighlights: [
-        {
-          match: 'South Delhi vs North Delhi',
-          tournament: 'Delhi Premier League 2024',
-          performance: '120 (50 balls) - 10 fours, 10 sixes (6 sixes in one over)',
-          context: 'Chasing 200+ under scoreboard pressure; achieved 6 sixes in the 12th over.'
-        },
-        {
-          match: 'Delhi vs Uttar Pradesh',
-          tournament: 'Syed Mushtaq Ali Trophy',
-          performance: '68* (34 balls) vs Shivam Mavi & Yash Dayal',
-          context: 'Chased target of 178 with 2 overs to spare.'
-        }
-      ]
-    }
-  },
-  {
-    id: 'rr-scout-02',
-    rank: 2,
-    name: 'Sameer Rizvi',
-    age: 21,
-    role: 'Middle-Order Finisher',
-    domesticTeam: 'Uttar Pradesh',
-    battingStyle: 'Right-Hand Bat',
-    bowlingStyle: 'Right-Arm Offbreak',
-    matchesPlayed: 28,
-    runsOrWickets: '740 Runs',
-    strikeRateOrEconomy: 164.8,
-    boundaryPercentage: 68.2,
-    deathPowerplayStat: 'Death SR: 206.4',
-    clutchPressureRating: 93.2,
-    winProbabilityAdded: 0.25,
-    dotBallPressureRatio: 24.1,
-    recommendedMaxBid: 4.20,
-    basePrice: 0.30,
-    primaryGapCovered: 'Finisher & Death Power',
-    scoutingReport: {
-      analystSummary: 'One of the premier clean hitters of spin in Indian domestic cricket. Rizvi strikes spin at an astonishing 178.5 and clears 80-meter boundaries with pure core torque and extension. Has tested high in our pressure leverage simulator when entering at 4 down.',
-      technicalStrengths: [
-        'Monster hitting arc between long-off and deep mid-wicket',
-        'Exceptional back-foot elevation against slow left-arm orthodox',
-        'Cold-blooded temperament in required run-rate 12+ chases',
-        'Capable off-spin utility bowler in match-ups against left-handers'
-      ],
-      areasOfDevelopment: [
-        'Short-pitch chest-height bouncers directed at right armpit',
-        'Needs sharper running between wickets to convert 1s into 2s'
-      ],
-      rajasthanRoyalsFit: 'Solves RR chronic death over finishing dependency. Can bat at #5 or #6 and pair with Shimron Hetmyer or Dhruv Jurel.',
-      projectedRole: 'Designated Spin Destroyer & Death Finisher',
-      scoutRating: 9.4,
-      metricsRadar: [
-        { label: 'Death Overs SR', value: 96, benchmark: 66 },
-        { label: 'Spin Assault Index', value: 98, benchmark: 64 },
-        { label: 'Boundary Frequency', value: 88, benchmark: 62 },
-        { label: 'Pressure Index (WPA)', value: 93, benchmark: 65 },
-        { label: 'Dot Ball Suppression', value: 82, benchmark: 60 }
-      ],
-      recentHighlights: [
-        {
-          match: 'UP vs Tamil Nadu',
-          tournament: 'Syed Mushtaq Ali Quarter-Final',
-          performance: '54* (22 balls) with 6 sixes against Varun C & Sai Kishore',
-          context: 'Came in at 84/4 requiring 88 off 38 deliveries; won with 3 balls left.'
-        },
-        {
-          match: 'UP vs Karnataka',
-          tournament: 'Vijay Hazare Trophy',
-          performance: '89 (58 balls) finishing innings at death',
-          context: 'Elevated team total from 210 to 318 in final 10 overs.'
-        }
-      ]
-    }
-  },
-  {
-    id: 'rr-scout-03',
-    rank: 3,
-    name: 'Rasikh Salam Dar',
-    age: 24,
-    role: 'Pace Bowler',
-    domesticTeam: 'Jammu & Kashmir',
-    battingStyle: 'Right-Hand Bat',
-    bowlingStyle: 'Right-Arm Fast-Medium',
-    matchesPlayed: 31,
-    runsOrWickets: '42 Wickets',
-    strikeRateOrEconomy: 7.42,
-    boundaryPercentage: 14.2,
-    deathPowerplayStat: 'Death Econ: 8.35',
-    clutchPressureRating: 92.6,
-    winProbabilityAdded: 0.26,
-    dotBallPressureRatio: 48.6,
-    recommendedMaxBid: 3.80,
-    basePrice: 0.30,
-    primaryGapCovered: 'Domestic Death Pacer',
-    scoutingReport: {
-      analystSummary: 'Highly evolved death and middle-overs pacer with a repertoire of deception. Bowls knuckle balls, back-of-the-hand slower balls, and skiddy 138 kph yorkers with minimal change in arm action. Outstanding boundary prevention metrics in high-leverage situations.',
-      technicalStrengths: [
-        'Superb slow dipping yorker with sudden late drift',
-        'High release angle making cutters grip even on true surfaces',
-        'Tactical awareness to bowl to wide long-boundary dimensions',
-        'Capable of taking wickets in clusters under pressure'
-      ],
-      areasOfDevelopment: [
-        'Control of line when batsmen move deep in crease',
-        'Fitness workload management across long 14-game campaigns'
-      ],
-      rajasthanRoyalsFit: 'Offers RR the Indian death-bowling partner for Sandeep Sharma and Trent Boult, preventing the need to spend an overseas slot on a specialist death seamer.',
-      projectedRole: 'Middle & Death Specialist / Enforcer Seamer',
-      scoutRating: 9.3,
-      metricsRadar: [
-        { label: 'Death Overs Economy', value: 92, benchmark: 60 },
-        { label: 'Dot Ball Pressure', value: 93, benchmark: 63 },
-        { label: 'Yorker Accuracy', value: 91, benchmark: 58 },
-        { label: 'Pressure Index (WPA)', value: 93, benchmark: 65 },
-        { label: 'Clutch Wicket Rate', value: 90, benchmark: 61 }
-      ],
-      recentHighlights: [
-        {
-          match: 'J&K vs Punjab',
-          tournament: 'Syed Mushtaq Ali Super League',
-          performance: '4/19 (4 overs) including 2 wickets in 19th over',
-          context: 'Defended 14 runs off the penultimate over against Shubman Gill led side.'
-        },
-        {
-          match: 'J&K vs Baroda',
-          tournament: 'Ranji Trophy / White Ball Trials',
-          performance: '3/24 (4 overs) with 14 dot balls',
-          context: 'Bowled overs 16, 18, and 20 conceding just 17 runs.'
-        }
-      ]
-    }
-  },
-  {
-    id: 'rr-scout-04',
-    rank: 4,
-    name: 'Vipraj Nigam',
-    age: 21,
-    role: 'Wrist Spinner',
-    domesticTeam: 'Uttar Pradesh',
-    battingStyle: 'Right-Hand Bat',
-    bowlingStyle: 'Right-Arm Legbreak / Googly',
-    matchesPlayed: 18,
-    runsOrWickets: '29 Wickets',
-    strikeRateOrEconomy: 6.85,
-    boundaryPercentage: 12.8,
-    deathPowerplayStat: 'Middle Econ: 6.50',
-    clutchPressureRating: 91.5,
-    winProbabilityAdded: 0.23,
-    dotBallPressureRatio: 52.3,
-    recommendedMaxBid: 3.20,
-    basePrice: 0.20,
-    primaryGapCovered: 'Mystery Wrist Spinner',
-    scoutingReport: {
-      analystSummary: 'Tall, quick-through-the-air leg spinner who gets extreme bounce and skid off length. Possesses a hard-to-pick googly with very subtle wrist seam tilt. In domestic tracking, right-handers average just 14.2 against his wrong-un.',
-      technicalStrengths: [
-        'Bowls between 94-101 kph, preventing batters from stepping out',
-        'Sharp bounce from a high 2.1m release height',
-        'Over 52% dot balls bowled in middle overs (7-15)',
-        'Extremely disciplined trajectory targeting stumps'
-      ],
-      areasOfDevelopment: [
-        'Can occasionally leak full tosses when trying to bowl too flat',
-        'Needs more variation in loop and flight when pitch is slow'
-      ],
-      rajasthanRoyalsFit: 'Provides Jaipur track bite and aggression. Natural successor archetype to maintain Rajasthan dominance in spin overs.',
-      projectedRole: 'Attacking Middle-Overs Enforcer & Googly Specialist',
-      scoutRating: 9.1,
-      metricsRadar: [
-        { label: 'Googly Deception', value: 95, benchmark: 60 },
-        { label: 'Dot Ball Pressure', value: 94, benchmark: 63 },
-        { label: 'Middle Overs Economy', value: 91, benchmark: 62 },
-        { label: 'Pressure Index (WPA)', value: 91, benchmark: 65 },
-        { label: 'Bounce & Skid Impact', value: 93, benchmark: 57 }
-      ],
-      recentHighlights: [
-        {
-          match: 'UP vs Mumbai',
-          tournament: 'SMAT 2024 Group Stage',
-          performance: '3/18 (4 overs) dismissed Rahane & Dube',
-          context: 'Choked the chase from 70/1 in 8 overs to 124 all out.'
-        },
-        {
-          match: 'UP vs Hyderabad',
-          tournament: 'Domestic T20 Series',
-          performance: '4/21 (4 overs) with 16 dot balls',
-          context: 'Turned match with 3 wickets in span of 7 deliveries.'
-        }
-      ]
-    }
-  },
-  {
-    id: 'rr-scout-05',
-    rank: 5,
-    name: 'Ashutosh Sharma',
-    age: 26,
-    role: 'Middle-Order Finisher',
-    domesticTeam: 'Railways / MP',
-    battingStyle: 'Right-Hand Bat',
-    matchesPlayed: 34,
-    runsOrWickets: '860 Runs',
-    strikeRateOrEconomy: 181.6,
-    boundaryPercentage: 76.2,
-    deathPowerplayStat: 'Death SR: 228.4',
-    clutchPressureRating: 94.2,
-    winProbabilityAdded: 0.31,
-    dotBallPressureRatio: 22.8,
-    recommendedMaxBid: 4.50,
-    basePrice: 0.30,
-    primaryGapCovered: 'Finisher & Death Power',
-    scoutingReport: {
-      analystSummary: 'A certified miracle worker under extreme leverage situations. Holds the Indian record for fastest domestic T20 fifty (11 balls). Demonstrated unparalleled composure in high-pressure IPL chases. Hits high-pace 145 kph yorkers into the upper decks via extraordinary wrist whip.',
-      technicalStrengths: [
-        'Incredible pickup sweep and paddle-scoop against 140+ pace',
-        'Top 1% strike rate in overs 18-20 across all domestic batsmen (228.4 SR)',
-        'Extremely calm pulse in 15+ RRR scenarios',
-        'High boundary conversion off good length balls'
-      ],
-      areasOfDevelopment: [
-        'Can be tied down by wide outside-off stump slower balls',
-        'Needs to avoid premeditating the scoop before ball release'
-      ],
-      rajasthanRoyalsFit: 'Gives RR the ultimate late-order insurance policy. Allows top order to play completely unfazed by fear of collapse.',
-      projectedRole: 'Clutch Death Finisher & Chase Specialist',
-      scoutRating: 9.5,
-      metricsRadar: [
-        { label: 'Death Overs SR', value: 98, benchmark: 66 },
-        { label: 'Leverage / Chase Rating', value: 97, benchmark: 65 },
-        { label: 'Boundary Frequency', value: 96, benchmark: 62 },
-        { label: '360 Ramp & Scoop', value: 93, benchmark: 55 },
-        { label: 'Dot Ball Suppression', value: 85, benchmark: 60 }
-      ],
-      recentHighlights: [
-        {
-          match: 'Railways vs Arunachal',
-          tournament: 'Syed Mushtaq Ali Trophy',
-          performance: '53 (12 balls) - Fastest fifty by an Indian (11 balls)',
-          context: 'Came in at 15th over and lifted total past 240.'
-        },
-        {
-          match: 'PBKS vs MI (IPL Matchup Study)',
-          tournament: 'High Pressure Chase Review',
-          performance: '61 (28 balls) almost stole game from 77/6',
-          context: 'Leverage index peaked at 9.4; swept Bumrah 145 kph yorker for six.'
-        }
-      ]
-    }
-  },
-  {
-    id: 'rr-scout-06',
-    rank: 6,
-    name: 'Angkrish Raghuvanshi',
-    age: 20,
-    role: 'Top-Order Batter',
-    domesticTeam: 'Mumbai',
-    battingStyle: 'Right-Hand Bat',
-    bowlingStyle: 'Slow Left-Arm Orthodox',
-    matchesPlayed: 22,
-    runsOrWickets: '620 Runs',
-    strikeRateOrEconomy: 156.4,
-    boundaryPercentage: 66.8,
-    deathPowerplayStat: 'PP SR: 164.2',
-    clutchPressureRating: 88.9,
-    winProbabilityAdded: 0.21,
-    dotBallPressureRatio: 26.5,
-    recommendedMaxBid: 3.40,
-    basePrice: 0.30,
-    primaryGapCovered: 'Middle-Order Anchor/Rotator',
-    scoutingReport: {
-      analystSummary: 'Classically trained Mumbai batter with immense maturity and contemporary T20 stroke play. Possesses immaculate balance at the crease, brilliant footwork against quality spin, and the ability to find gaps effortlessly during middle-overs consolidation.',
-      technicalStrengths: [
-        'Classical high-elbow stroke play combined with reverse ramps',
-        'Outstanding strike rotation against finger spin (only 22% dots vs spin)',
-        'Versatility to bat anywhere from #1 to #4 without disruption',
-        'Sound defensive technique when facing fresh Dukes/Kookaburra swing'
-      ],
-      areasOfDevelopment: [
-        'Raw muscle power on slow sluggish wickets when timing fails',
-        'Needs to add 10-15 meters of carry on boundary clearing hits'
-      ],
-      rajasthanRoyalsFit: 'Slotting him at #3 or #4 provides tactical flexibility, allowing Samson and Jurel to be deployed as dynamic pinch floaters based on match phase.',
-      projectedRole: 'Top-Order Stroke Maker & Innings Constructor',
-      scoutRating: 8.9,
-      metricsRadar: [
-        { label: 'Spin Footwork & SR', value: 92, benchmark: 64 },
-        { label: 'Innings Adaptability', value: 90, benchmark: 60 },
-        { label: 'Technical Soundness', value: 94, benchmark: 68 },
-        { label: 'Pressure Index (WPA)', value: 89, benchmark: 65 },
-        { label: 'Dot Ball Suppression', value: 88, benchmark: 60 }
-      ],
-      recentHighlights: [
-        {
-          match: 'Mumbai vs Baroda',
-          tournament: 'SMAT Knockouts',
-          performance: '74 (41 balls) guiding tricky chase',
-          context: 'Built 110-run stand after Mumbai lost two quick wickets in powerplay.'
-        },
-        {
-          match: 'India U19 / Emerging Trials',
-          tournament: 'BCCI Talent Series',
-          performance: '278 runs in 5 matches at 154 SR',
-          context: 'Finished as tournament top run-scorer with 3 half-centuries.'
-        }
-      ]
-    }
-  },
-  {
-    id: 'rr-scout-07',
-    rank: 7,
-    name: 'Digvesh Rathi',
-    age: 23,
-    role: 'Pace Bowler',
-    domesticTeam: 'Haryana / DPL',
-    battingStyle: 'Right-Hand Bat',
-    bowlingStyle: 'Right-Arm Fast (142+ kph)',
-    matchesPlayed: 19,
-    runsOrWickets: '31 Wickets',
-    strikeRateOrEconomy: 7.28,
-    boundaryPercentage: 13.9,
-    deathPowerplayStat: 'PP Econ: 6.10',
-    clutchPressureRating: 89.4,
-    winProbabilityAdded: 0.22,
-    dotBallPressureRatio: 54.1,
-    recommendedMaxBid: 2.80,
-    basePrice: 0.20,
-    primaryGapCovered: 'Domestic Death Pacer',
-    scoutingReport: {
-      analystSummary: 'Express genuine quick who consistently touches 142-144 kph. Extracts awkward steep bounce from good lengths and possesses a lethal nip-backer that targets right-handers stumps. Economical in powerplay and generates high false-shot percentages.',
-      technicalStrengths: [
-        'Genuine pace (>142 kph) with upright seam presentation',
-        'Superb powerplay control: 54.1% dot ball percentage',
-        'Brisk bouncer that rushes batter on pull shot',
-        'Terrific aggression and athletic boundary fielder'
-      ],
-      areasOfDevelopment: [
-        'Consistency of death over wide line targets under dew conditions',
-        'Can concede extra extras (wides) when searching for extra swing'
-      ],
-      rajasthanRoyalsFit: 'Gives RR the raw Indian pace firepower to shock oppositions, working alongside bowling coach Shane Bond to turn him into a marquee enforcer.',
-      projectedRole: 'High-Pace Hit-the-Deck Enforcer',
-      scoutRating: 8.9,
-      metricsRadar: [
-        { label: 'Raw Pace & Bounce', value: 96, benchmark: 60 },
-        { label: 'Powerplay Economy', value: 92, benchmark: 63 },
-        { label: 'Dot Ball Pressure', value: 94, benchmark: 63 },
-        { label: 'Pressure Index (WPA)', value: 89, benchmark: 65 },
-        { label: 'Wicket Strike Rate', value: 88, benchmark: 61 }
-      ],
-      recentHighlights: [
-        {
-          match: 'Haryana vs Bengal',
-          tournament: 'Syed Mushtaq Ali Group Stage',
-          performance: '3/16 (4 overs) dismantled top order',
-          context: 'Took 2 wickets in the second over of the innings bowling 143 kph.'
-        },
-        {
-          match: 'DPL Invitational',
-          tournament: 'North Zone T20',
-          performance: '4/22 including match-winning 20th over',
-          context: 'Conceded only 3 runs in the final over with 2 bowled dismissals.'
-        }
-      ]
-    }
-  },
-  {
-    id: 'rr-scout-08',
-    rank: 8,
-    name: 'Musheer Khan',
-    age: 20,
-    role: 'All-Rounder',
-    domesticTeam: 'Mumbai',
-    battingStyle: 'Right-Hand Bat',
-    bowlingStyle: 'Slow Left-Arm Orthodox',
-    matchesPlayed: 20,
-    runsOrWickets: '590 Runs / 19 Wkts',
-    strikeRateOrEconomy: 142.5,
-    boundaryPercentage: 61.4,
-    deathPowerplayStat: 'Econ: 6.95 / SR: 142.5',
-    clutchPressureRating: 92.1,
-    winProbabilityAdded: 0.27,
-    dotBallPressureRatio: 28.2,
-    recommendedMaxBid: 3.60,
-    basePrice: 0.30,
-    primaryGapCovered: 'Middle-Order Anchor/Rotator',
-    scoutingReport: {
-      analystSummary: 'Fierce competitor with proven pedigree in tournament finals. Possesses rock-solid technique under crisis and crafty, accurate slow left-arm spin that chokes run-rates. Winner mindset with huge emotional resilience and hunger for high-stakes moments.',
-      technicalStrengths: [
-        'Steely determination in crisis matches; thrives under extreme scrutiny',
-        'Excellent bat control against quality seam bowling on spicy wickets',
-        'Stump-to-stump left-arm darts giving <7.0 RPO in middle overs',
-        'Outstanding tactical awareness and match situation reading'
-      ],
-      areasOfDevelopment: [
-        'Accelerating strike rate beyond 170 in death overs',
-        'Power-hitting range on off-side against full wide deliveries'
-      ],
-      rajasthanRoyalsFit: 'Provides genuine all-round balance. Can bat #6 or #7 and bowl 2-3 tight overs, easing overseas all-rounder reliance.',
-      projectedRole: 'Crisis Anchor & Tactical Multi-Tool All-Rounder',
-      scoutRating: 9.2,
-      metricsRadar: [
-        { label: 'Big-Match Temperament', value: 97, benchmark: 65 },
-        { label: 'All-Round Utility', value: 91, benchmark: 60 },
-        { label: 'Bowling Economy', value: 89, benchmark: 62 },
-        { label: 'Pressure Index (WPA)', value: 92, benchmark: 65 },
-        { label: 'Innings Construction', value: 94, benchmark: 66 }
-      ],
-      recentHighlights: [
-        {
-          match: 'Mumbai vs Vidarbha',
-          tournament: 'Ranji Trophy Final',
-          performance: '136 (256 balls) & 2 wickets in final',
-          context: 'Rescued Mumbai from 34/2 to secure title under immense pressure.'
-        },
-        {
-          match: 'India U19 vs New Zealand U19',
-          tournament: 'ICC U19 World Cup',
-          performance: '131 (126 balls) & 2/10 (3.1 overs)',
-          context: 'Dominated match completely from start to finish.'
-        }
-      ]
-    }
-  },
-  {
-    id: 'rr-scout-09',
-    rank: 9,
-    name: 'Kumar Kushagra',
-    age: 21,
-    role: 'Wicketkeeper-Batter',
-    domesticTeam: 'Jharkhand',
-    battingStyle: 'Right-Hand Bat',
-    matchesPlayed: 25,
-    runsOrWickets: '610 Runs',
-    strikeRateOrEconomy: 162.8,
-    boundaryPercentage: 67.5,
-    deathPowerplayStat: 'Death SR: 194.2',
-    clutchPressureRating: 87.8,
-    winProbabilityAdded: 0.19,
-    dotBallPressureRatio: 25.1,
-    recommendedMaxBid: 2.60,
-    basePrice: 0.20,
-    primaryGapCovered: 'Dynamic Wicketkeeper',
-    scoutingReport: {
-      analystSummary: 'Dynamic wicketkeeper-batter from MS Dhoni school of hard hitting in Jharkhand. Renowned for monstrous pull shots and clean bat swing against fast bowling. Capable of batting anywhere between #4 and #7 and taking games deep with tactical calculated risk.',
-      technicalStrengths: [
-        'Lightning fast hands behind the stumps (sub 0.15s stumping reflex)',
-        'Devastating pull shot off back foot against 140+ pace',
-        'High boundary rate in overs 16-20 (194.2 SR at death)',
-        'Very quick between wickets pushing extra runs'
-      ],
-      areasOfDevelopment: [
-        'Spin defense during first 10 balls against sharp turning leg breaks',
-        'Patience against disciplined wide yorker lines'
-      ],
-      rajasthanRoyalsFit: 'Provides elite backup and rotation for Sanju Samson behind the stumps, plus dynamic lower middle order firepower.',
-      projectedRole: 'Finisher Wicketkeeper & Middle-Order Spark',
-      scoutRating: 8.8,
-      metricsRadar: [
-        { label: 'Death Overs SR', value: 91, benchmark: 66 },
-        { label: 'Glovework Reflexes', value: 94, benchmark: 65 },
-        { label: 'Backfoot Pull Power', value: 93, benchmark: 60 },
-        { label: 'Pressure Index (WPA)', value: 88, benchmark: 65 },
-        { label: 'Running Between Wickets', value: 90, benchmark: 62 }
-      ],
-      recentHighlights: [
-        {
-          match: 'Jharkhand vs Maharashtra',
-          tournament: 'Vijay Hazare Trophy',
-          performance: '67 (37 balls) chasing 355 runs',
-          context: 'Smashed 5 sixes to guide improbable chase to victory.'
-        },
-        {
-          match: 'East Zone Trials',
-          tournament: 'Deodhar Trophy Selection',
-          performance: '98* (52 balls) batting at #6',
-          context: 'Took team from 145/5 in 30 overs to 320/6.'
-        }
-      ]
-    }
-  },
-  {
-    id: 'rr-scout-10',
-    rank: 10,
-    name: 'Manav Suthar',
-    age: 23,
-    role: 'Finger Spinner',
-    domesticTeam: 'Rajasthan (Home Grown)',
-    battingStyle: 'Left-Hand Bat',
-    bowlingStyle: 'Slow Left-Arm Orthodox',
-    matchesPlayed: 26,
-    runsOrWickets: '38 Wickets',
-    strikeRateOrEconomy: 6.92,
-    boundaryPercentage: 11.5,
-    deathPowerplayStat: 'Middle Econ: 6.45',
-    clutchPressureRating: 88.5,
-    winProbabilityAdded: 0.20,
-    dotBallPressureRatio: 56.4,
-    recommendedMaxBid: 2.40,
-    basePrice: 0.20,
-    primaryGapCovered: 'Mystery Wrist Spinner',
-    scoutingReport: {
-      analystSummary: 'Homegrown Rajasthan talent who understands the Sawai Mansingh Stadium surface better than anyone. Tall left-arm spinner who gets natural drift and steep overspin. Capable of bowling in powerplay and holding down one end with remarkable economy.',
-      technicalStrengths: [
-        'Unmatched familiarity with Sawai Mansingh Stadium pitch nuances',
-        'Extraordinary dot-ball consistency: 56.4% dots in middle overs',
-        'Arm ball skids on quickly under lights causing bowled and LBW dismissals',
-        'Handy lower order left-handed batting capability'
-      ],
-      areasOfDevelopment: [
-        'Tends to bowl too short when batsmen step out aggressively',
-        'Needs to develop a slower floater to deceive advancing batters'
-      ],
-      rajasthanRoyalsFit: 'Locally grown hero who immediately connects with the Jaipur fan base while filling the crucial domestic left-arm spin role.',
-      projectedRole: 'Home Ground Weapon & Defensive Inning Stifler',
-      scoutRating: 8.8,
-      metricsRadar: [
-        { label: 'Home Track Expertise', value: 98, benchmark: 55 },
-        { label: 'Dot Ball Pressure', value: 96, benchmark: 63 },
-        { label: 'Middle Overs Economy', value: 92, benchmark: 62 },
-        { label: 'Pressure Index (WPA)', value: 88, benchmark: 65 },
-        { label: 'Arm Ball Deception', value: 89, benchmark: 59 }
-      ],
-      recentHighlights: [
-        {
-          match: 'Rajasthan vs Gujarat',
-          tournament: 'Ranji / SMAT Series at Jaipur',
-          performance: '4/28 & 3/31 at Sawai Mansingh Stadium',
-          context: 'Bowled Rajasthan to a historic home victory with relentless accuracy.'
-        },
-        {
-          match: 'India A vs England Lions',
-          tournament: 'First Class Tour',
-          performance: '5/44 in second innings',
-          context: 'Spun India A to victory on day 4 with unplayable drift.'
-        }
-      ]
-    }
-  }
-];
-
-export interface MethodologySection {
+export interface SquadGapV7 {
   id: string;
-  title: string;
-  subtitle: string;
+  gapName: string;
+  urgency: 'Critical' | 'High' | 'Moderate';
   description: string;
-  formulaLatex?: string;
-  formulaExplanation: string[];
-  keyParameters: { name: string; weight: string; role: string }[];
+  keyTargetIds: string[];
 }
 
-export const SCORING_METHODOLOGY: MethodologySection[] = [
+export const RR_5_SQUAD_GAPS: SquadGapV7[] = [
   {
-    id: 'pressure-index',
-    title: '1. Dynamic Pressure Index (DPI) & Clutch Impact Formula',
-    subtitle: 'Context-Weighted Ball-by-Ball Leverage Modeling',
-    description: 'Raw strike rates and economies in domestic cricket are heavily skewed by mismatched opposition and low-stakes blowouts. The SupeRR Selector model computes a Dynamic Pressure Index (DPI) by weighting every ball by its Leverage Index (LI) and Win Probability Added (WPA).',
-    formulaLatex: 'DPI_i = \\sum_{b=1}^{B_i} \\Big[ \\omega_{phase} \\cdot \\text{LI}(b) \\times \\big( \\Delta\\text{WPA}(b) + \\beta \\cdot \\text{BPA}(b) \\big) \\Big] \\times \\Psi_{opp}',
-    formulaExplanation: [
-      'LI(b): Match Leverage Index at ball b (measures how much the win probability hangs in the balance based on balls remaining, wickets in hand, and required run rate).',
-      'ΔWPA(b): Net change in Win Probability Added resulting directly from the event (boundary, wicket, dot, single).',
-      'ω_phase: Phase weight factor (Powerplay: 1.15x, Middle Overs: 0.95x, Death Overs 16-20: 1.45x).',
-      'BPA(b): Boundary Pressure Added (bonus reward for hitting boundaries after 2 consecutive dot balls).',
-      'Ψ_opp: Opponent Quality Matrix factor, normalizing player statistics against the tier and pace/spin quality of the domestic opposition.'
-    ],
-    keyParameters: [
-      { name: 'Death Phase Multiplier', weight: '1.45x', role: 'Amplifies performance in overs 16-20' },
-      { name: 'Leverage Cutoff (LI > 1.8)', weight: '2.00x', role: 'Rewards players performing when match hangs by a thread' },
-      { name: 'Opponent Quality Matrix (OQM)', weight: '0.7x - 1.3x', role: 'Normalizes runs against elite state attacks vs plate teams' },
-      { name: 'Bayesian Shrinkage Prior', weight: 'k = 25 balls', role: 'Dampens small-sample variance for debutants' }
-    ]
+    id: 'death-pacer',
+    gapName: '1. Domestic/Overseas Death Pacer',
+    urgency: 'Critical',
+    description: 'Pinpoint yorkers and skiddy variations in overs 17-20 at Sawai Mansingh Stadium. Redundant opening pacers excluded.',
+    keyTargetIds: ['1556', '3174', '56185', '5951']
   },
   {
-    id: 'auction-valuation',
-    title: '2. Auction Purse Optimization & Max Bid Algorithm',
-    subtitle: 'Replacement-Level Valuation & Scarcity Curve',
-    description: 'To prevent emotional overbidding at the auction table, our Valuation Engine computes a deterministic Recommended Max Bid (RMB) in ₹ Crores. It combines the player’s projected Win Contribution with the historical supply-demand curve for that specific tactical niche.',
-    formulaLatex: '\\text{RMB}_i = \\text{BasePrice}_i + \\left( \\frac{\\text{DPI}_i - \\mu_{uncapped}}{\\sigma_{uncapped}} \\right) \\times \\Phi_{scarcity}(\\text{Role}_i) \\times \\text{BudgetFactor}_{RR}',
-    formulaExplanation: [
-      'BasePrice_i: Base registration bracket (₹ 0.20 Cr or ₹ 0.30 Cr).',
-      'Standardized DPI: Z-score of the player’s Dynamic Pressure Index compared to the entire 842-player domestic pool.',
-      'Φ_scarcity(Role): Supply elasticity multiplier. Roles with acute shortage in the auction pool (e.g., Domestic Death Pacers: 1.8x, Power Finisher: 1.6x) receive higher ceilings.',
-      'BudgetFactor_RR: Target purse constraint ensuring RR never commits more than 48% of total purse to uncapped slots.'
-    ],
-    keyParameters: [
-      { name: 'Death Pacer Scarcity Factor', weight: '1.85x', role: 'High premium due to severe scarcity of Indian fast bowlers' },
-      { name: 'Spin Destroyer Scarcity Factor', weight: '1.60x', role: 'Premium for middle order batters who strike spin > 160' },
-      { name: 'Top Order Anchor Deflator', weight: '0.85x', role: 'Discounted ceiling due to abundant domestic supply' },
-      { name: 'Max Single-Player Cap', weight: '₹ 5.00 Cr', role: 'Hard risk mitigation stop-loss for any uncapped pick' }
-    ]
+    id: 'lower-finisher',
+    gapName: '2. Dynamic Lower-Order Finisher / Spin Destroyer',
+    urgency: 'Critical',
+    description: 'Brute power hitters striking >160 against spin and >190 at death from ball one. Redundant anchors excluded.',
+    keyTargetIds: ['6554', '3782', '7059']
   },
   {
-    id: 'rr-home-pitch',
-    title: '3. Sawai Mansingh Stadium Dimension & Pitch Alignment',
-    subtitle: 'Jaipur Ground Matchup Optimization',
-    description: 'A player who dominates at Chinnaswamy or Wankhede can struggle on the expansive dimensions of Sawai Mansingh Stadium in Jaipur (square boundaries 68-72m, straight boundaries 74m+). Our model filters for players whose shot dispersion maps and bowling arcs match Jaipur conditions.',
-    formulaExplanation: [
-      'Square Boundary Defensibility: Prioritizes fast bowlers with heavy lengths and cutters that induce mishits towards 70m square ropes.',
-      'Middle-Overs Rotation: Batters must possess low dot-ball rates (<28%) to survive Jaipur larger outfields when boundaries dry up.',
-      'Wrist Spin Gripping Factor: Pitch analysis shows SMS Stadium offers 3.2 degrees average lateral turn under lights with high bounce.'
-    ],
-    keyParameters: [
-      { name: 'Square Boundary Distance', weight: '71m avg', role: 'Favors deep mid-wicket and square leg power hitters' },
-      { name: 'Dew Factor Offset', weight: '-0.40 ER', role: 'Adjusts bowler metrics for second innings dew' },
-      { name: 'Running Velocity Metric', weight: '1.20x', role: 'Rewards speed between wickets for two-run conversions' }
-    ]
+    id: 'mystery-spinner',
+    gapName: '3. Mystery Wrist Spinner / Attacking Leg-Spinner',
+    urgency: 'High',
+    description: 'Chahal-successor archetype: high revs, deceiving googly against LHB, sub-7.50 middle overs economy on Jaipur track. Left-arm orthodox spinners excluded.',
+    keyTargetIds: ['4900', '32862', '56559']
+  },
+  {
+    id: 'pace-allrounder',
+    gapName: '4. Pace-Bowling All-Rounder / Seam Utility',
+    urgency: 'High',
+    description: 'Seam bowling option providing 2-3 hard-length overs plus lower-order boundaries at #7. Eases overseas balance.',
+    keyTargetIds: ['19781', '6461']
+  },
+  {
+    id: 'wk-finisher',
+    gapName: '5. Dynamic Power Middle-Order / Backup WK-Batter',
+    urgency: 'Moderate',
+    description: 'Aggressive 360-degree stroke maker who backs up Sanju Samson and floats between #4 and #6.',
+    keyTargetIds: ['58135', '4211']
   }
 ];
+
+// 1. ALL-PLAYER OPEN TOP 20 BATTERS (HL-PRS v7)
+export const OPEN_TOP_20_BATTERS: HLPRSPlayer[] = [
+  {
+    rank: 1,
+    player_id: '68303',
+    player_name: 'Abhishek Pathak',
+    nationality: 'India',
+    role: 'Top-Order Batter',
+    total_matches: 18,
+    total_runs: 564,
+    total_balls: 272,
+    career_sr: '207.4',
+    total_wkts: 0,
+    legal_overs: '0.0',
+    career_econ: '0.00',
+    n_press: 15,
+    eb_avg_press: 44.4,
+    eb_sr_press: 207.4,
+    eb_econ_press: 8.15,
+    eb_bowlsr_press: 18.8,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 1.9,
+    b_pedigree: 0.8,
+    hl_prs_score: 99.4,
+    tacticalNotes: 'Unprecedented domestic strike rate (207.4) maintained across high-leverage powerplay and death overs.',
+    strengths: ['Elite bat speed >142 kph', 'Zero stat-padding penalty', 'Clutch boundary conversion in chases'],
+    weaknesses: ['Small international tournament sample size']
+  },
+  {
+    rank: 2,
+    player_id: '6554',
+    player_name: 'Salman Nizar',
+    nationality: 'India',
+    role: 'Middle-Order Finisher',
+    total_matches: 62,
+    total_runs: 1458,
+    total_balls: 966,
+    career_sr: '150.9',
+    total_wkts: 1,
+    legal_overs: '2.0',
+    career_econ: '8.00',
+    n_press: 48,
+    eb_avg_press: 55.9,
+    eb_sr_press: 150.9,
+    eb_econ_press: 8.15,
+    eb_bowlsr_press: 18.8,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 3.2,
+    b_pedigree: 0.8,
+    hl_prs_score: 86.5,
+    tacticalNotes: 'Kerala crisis specialist with extraordinary 55.9 pressure average under severe collapse conditions.',
+    strengths: ['Demolishes spin in overs 11-16', 'Supreme temperament in 40/4 recoveries', 'High boundary rate'],
+    weaknesses: ['Requires set base against high-pace 145 kph yorkers']
+  },
+  {
+    rank: 3,
+    player_id: '56885',
+    player_name: 'Ayush Mhatre',
+    nationality: 'India',
+    role: 'Top-Order Batter',
+    total_matches: 22,
+    total_runs: 720,
+    total_balls: 401,
+    career_sr: '179.7',
+    total_wkts: 0,
+    legal_overs: '0.0',
+    career_econ: '0.00',
+    n_press: 19,
+    eb_avg_press: 33.5,
+    eb_sr_press: 179.7,
+    eb_econ_press: 8.15,
+    eb_bowlsr_press: 18.8,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 2.0,
+    b_pedigree: 0.8,
+    hl_prs_score: 86.5,
+    tacticalNotes: 'Teen prodigy with fearless intent clearing field restrictions with 180+ powerplay strike rate.',
+    strengths: ['Exceptional lofted extra cover drive', 'High backfoot elevation', 'Unshakable boundary intent'],
+    weaknesses: ['Susceptible to sharp inswinging yorkers early']
+  },
+  {
+    rank: 4,
+    player_id: '68305',
+    player_name: 'Priyansh Arya',
+    nationality: 'India',
+    role: 'Top-Order Batter',
+    total_matches: 34,
+    total_runs: 1120,
+    total_balls: 626,
+    career_sr: '178.8',
+    total_wkts: 0,
+    legal_overs: '0.0',
+    career_econ: '0.00',
+    n_press: 28,
+    eb_avg_press: 33.9,
+    eb_sr_press: 178.8,
+    eb_econ_press: 8.15,
+    eb_bowlsr_press: 18.8,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 3.5,
+    b_pedigree: 0.8,
+    hl_prs_score: 86.4,
+    tacticalNotes: 'DPL record breaker (six sixes in an over) who translates intent seamlessly into pressure chases.',
+    strengths: ['Immense forearm torque', 'Aggression against express pace', 'Low dot-ball percentage'],
+    weaknesses: ['Outside-off wide trap patience']
+  },
+  {
+    rank: 5,
+    player_id: '1699',
+    player_name: 'Suryakumar Yadav',
+    nationality: 'India',
+    role: 'Top-Order Batter',
+    total_matches: 171,
+    total_runs: 5408,
+    total_balls: 3316,
+    career_sr: '163.1',
+    total_wkts: 2,
+    legal_overs: '1.3',
+    career_econ: '6.75',
+    n_press: 131,
+    eb_avg_press: 36.1,
+    eb_sr_press: 162.0,
+    eb_econ_press: 8.15,
+    eb_bowlsr_press: 18.8,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 5.7,
+    b_pedigree: 3.5,
+    hl_prs_score: 79.5,
+    is_high_baseline: true,
+    tacticalNotes: 'Global T20 pinnacle. Maintained elite pressure floor (Avg 36.1, SR 162.0) with zero stat-padding penalty.',
+    strengths: ['360-degree field manipulation', 'Asymmetric baseline protection tier', 'Massive volume sample'],
+    weaknesses: ['Rare slow starts against disciplined wide-line plans']
+  },
+  {
+    rank: 6,
+    player_id: '4389',
+    player_name: 'Sachin Baby',
+    nationality: 'India',
+    role: 'Middle-Order Finisher',
+    total_matches: 58,
+    total_runs: 1680,
+    total_balls: 1115,
+    career_sr: '150.6',
+    total_wkts: 4,
+    legal_overs: '14.0',
+    career_econ: '7.80',
+    n_press: 45,
+    eb_avg_press: 42.1,
+    eb_sr_press: 150.6,
+    eb_econ_press: 8.15,
+    eb_bowlsr_press: 18.8,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 3.2,
+    b_pedigree: 1.15,
+    hl_prs_score: 78.6,
+    tacticalNotes: 'Experienced domestic anchor who pivots seamlessly into a high-octane 150+ SR crisis stabilizer.',
+    strengths: ['Veteran match situation awareness', 'Calculated risks against left-arm spin'],
+    weaknesses: ['Boundary clearing in overs 19-20 against express pace']
+  },
+  {
+    rank: 7,
+    player_id: '7156',
+    player_name: 'Sai Sudharsan',
+    nationality: 'India',
+    role: 'Top-Order Batter',
+    total_matches: 76,
+    total_runs: 2840,
+    total_balls: 1908,
+    career_sr: '148.8',
+    total_wkts: 0,
+    legal_overs: '0.0',
+    career_econ: '0.00',
+    n_press: 62,
+    eb_avg_press: 47.4,
+    eb_sr_press: 148.8,
+    eb_econ_press: 8.15,
+    eb_bowlsr_press: 18.8,
+    p_flop: 0,
+    p_pad: 7.3,
+    b_vol: 4.3,
+    b_pedigree: 2.5,
+    hl_prs_score: 77.3,
+    tacticalNotes: 'High-volume accumulator with elite 47.4 pressure average, docked by -7.3 for occasional slow-anchor loss knocks.',
+    strengths: ['High technical floor', 'IPL Final proven heroics', 'Exceptional against pace on true tracks'],
+    weaknesses: ['Penalized by Stage 5 for sub-par SR in team losses']
+  },
+  {
+    rank: 8,
+    player_id: '813',
+    player_name: 'Jos Buttler',
+    nationality: 'England',
+    role: 'Wicketkeeper-Batter',
+    total_matches: 184,
+    total_runs: 5820,
+    total_balls: 3877,
+    career_sr: '150.1',
+    total_wkts: 0,
+    legal_overs: '0.0',
+    career_econ: '0.00',
+    n_press: 142,
+    eb_avg_press: 39.2,
+    eb_sr_press: 150.1,
+    eb_econ_press: 8.15,
+    eb_bowlsr_press: 18.8,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 5.8,
+    b_pedigree: 3.5,
+    hl_prs_score: 75.9,
+    is_high_baseline: true,
+    tacticalNotes: 'T20 royalty. Exemplifies Asymmetric Baseline Protection: zero flop penalty, elite 39.2 pressure average.',
+    strengths: ['Ramp and scoop master', 'Second-innings chase accelerator', 'Proven knockout match-winner'],
+    weaknesses: ['Early swing vulnerability in first 4 deliveries']
+  },
+  {
+    rank: 9,
+    player_id: '68308',
+    player_name: 'Sameer Rizvi',
+    nationality: 'India',
+    role: 'Middle-Order Finisher',
+    total_matches: 48,
+    total_runs: 1390,
+    total_balls: 909,
+    career_sr: '152.8',
+    total_wkts: 3,
+    legal_overs: '6.0',
+    career_econ: '8.50',
+    n_press: 38,
+    eb_avg_press: 38.8,
+    eb_sr_press: 152.8,
+    eb_econ_press: 8.15,
+    eb_bowlsr_press: 18.8,
+    p_flop: 0,
+    p_pad: 0.5,
+    b_vol: 3.8,
+    b_pedigree: 1.15,
+    hl_prs_score: 75.6,
+    tacticalNotes: 'UP powerhouse striking spin at 170+ with high boundary frequency in required run rate 12+ scenarios.',
+    strengths: ['Vicious pull and long-on launch', 'High leverage index performance'],
+    weaknesses: ['Running between wickets acceleration']
+  },
+  {
+    rank: 10,
+    player_id: '1540',
+    player_name: 'Karun Nair',
+    nationality: 'India',
+    role: 'Top-Order Batter',
+    total_matches: 64,
+    total_runs: 1890,
+    total_balls: 1162,
+    career_sr: '162.6',
+    total_wkts: 0,
+    legal_overs: '0.0',
+    career_econ: '0.00',
+    n_press: 41,
+    eb_avg_press: 33.7,
+    eb_sr_press: 162.6,
+    eb_econ_press: 8.15,
+    eb_bowlsr_press: 18.8,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 3.7,
+    b_pedigree: 1.15,
+    hl_prs_score: 73.7,
+    tacticalNotes: 'Resurgent middle overs enforcer with 162.6 SR under leverage and clean sweep mechanics.',
+    strengths: ['Innovative lap sweeps', 'Dominates leg-spin trajectory'],
+    weaknesses: ['Outside off 140+ bounce defense']
+  },
+  {
+    rank: 11,
+    player_id: '6550',
+    player_name: 'Sanvir Singh',
+    nationality: 'India',
+    role: 'All-Rounder',
+    total_matches: 42,
+    total_runs: 820,
+    total_balls: 476,
+    career_sr: '172.3',
+    total_wkts: 12,
+    legal_overs: '48.0',
+    career_econ: '8.40',
+    n_press: 32,
+    eb_avg_press: 33.6,
+    eb_sr_press: 172.3,
+    eb_econ_press: 8.15,
+    eb_bowlsr_press: 18.8,
+    p_flop: 7.9,
+    p_pad: 0,
+    b_vol: 3.1,
+    b_pedigree: 1.15,
+    hl_prs_score: 72.8,
+    tacticalNotes: 'Explosive all-round option with 172.3 SR but docked -7.9 by Stage 4 for two low-score playoff dismissals.',
+    strengths: ['Immediate boundary hitting from ball 1', 'Heavy ball seam utility'],
+    weaknesses: ['Penalized by Habitual Knockout Flop rule in qualifiers']
+  },
+  {
+    rank: 12,
+    player_id: '4260',
+    player_name: 'Heinrich Klaasen',
+    nationality: 'South Africa',
+    role: 'Middle-Order Finisher',
+    total_matches: 156,
+    total_runs: 4320,
+    total_balls: 2681,
+    career_sr: '161.1',
+    total_wkts: 0,
+    legal_overs: '0.0',
+    career_econ: '0.00',
+    n_press: 122,
+    eb_avg_press: 32.2,
+    eb_sr_press: 161.1,
+    eb_econ_press: 8.15,
+    eb_bowlsr_press: 18.8,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 5.5,
+    b_pedigree: 3.5,
+    hl_prs_score: 72.8,
+    is_high_baseline: true,
+    tacticalNotes: 'Unrivaled destroyer of finger and wrist spin in middle overs. Elite 161.1 pressure strike rate.',
+    strengths: ['Backfoot maximums against spin', 'Clears 85m boundaries with ease'],
+    weaknesses: ['Wide yorkers delivered outside off-stump at death']
+  },
+  {
+    rank: 13,
+    player_id: '4758',
+    player_name: 'Rinku Singh',
+    nationality: 'India',
+    role: 'Middle-Order Finisher',
+    total_matches: 98,
+    total_runs: 2340,
+    total_balls: 1515,
+    career_sr: '154.4',
+    total_wkts: 0,
+    legal_overs: '0.0',
+    career_econ: '0.00',
+    n_press: 86,
+    eb_avg_press: 35.9,
+    eb_sr_press: 154.4,
+    eb_econ_press: 8.15,
+    eb_bowlsr_press: 18.8,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 4.9,
+    b_pedigree: 3.5,
+    hl_prs_score: 72.7,
+    is_high_baseline: true,
+    tacticalNotes: 'Certified miracle worker in final-over chases. 154.4 pressure strike rate with ice in his veins.',
+    strengths: ['Clutch final over boundary hitting', 'Immaculate composure under maximum leverage'],
+    weaknesses: ['Short pitched bodyline bouncers']
+  },
+  {
+    rank: 14,
+    player_id: '68309',
+    player_name: 'Shashwat Dangwal',
+    nationality: 'India',
+    role: 'Top-Order Batter',
+    total_matches: 16,
+    total_runs: 480,
+    total_balls: 312,
+    career_sr: '153.6',
+    total_wkts: 0,
+    legal_overs: '0.0',
+    career_econ: '0.00',
+    n_press: 12,
+    eb_avg_press: 38.2,
+    eb_sr_press: 153.6,
+    eb_econ_press: 8.15,
+    eb_bowlsr_press: 18.8,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 1.5,
+    b_pedigree: 0.8,
+    hl_prs_score: 72.3,
+    tacticalNotes: 'Emerging stroke maker with 38.2 pressure average across regional elite tournaments.',
+    strengths: ['Clean gap piercing', 'Low dot-ball rate'],
+    weaknesses: ['Limited sample against international quality pace']
+  },
+  {
+    rank: 15,
+    player_id: '4922',
+    player_name: 'Ajay Rohera',
+    nationality: 'India',
+    role: 'Wicketkeeper-Batter',
+    total_matches: 28,
+    total_runs: 760,
+    total_balls: 468,
+    career_sr: '162.1',
+    total_wkts: 0,
+    legal_overs: '0.0',
+    career_econ: '0.00',
+    n_press: 22,
+    eb_avg_press: 34.6,
+    eb_sr_press: 162.1,
+    eb_econ_press: 8.15,
+    eb_bowlsr_press: 18.8,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 2.4,
+    b_pedigree: 0.8,
+    hl_prs_score: 71.9,
+    tacticalNotes: 'Aggressive keeper-batter striking 162.1 under pressure with rapid pickup shots.',
+    strengths: ['Backfoot pull power', 'Nimble stumping reflexes'],
+    weaknesses: ['Struggles against quality mystery spin']
+  },
+  {
+    rank: 16,
+    player_id: '68310',
+    player_name: 'Vansh Bedi',
+    nationality: 'India',
+    role: 'Top-Order Batter',
+    total_matches: 18,
+    total_runs: 460,
+    total_balls: 257,
+    career_sr: '178.7',
+    total_wkts: 0,
+    legal_overs: '0.0',
+    career_econ: '0.00',
+    n_press: 14,
+    eb_avg_press: 27.8,
+    eb_sr_press: 178.7,
+    eb_econ_press: 8.15,
+    eb_bowlsr_press: 18.8,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 1.8,
+    b_pedigree: 0.8,
+    hl_prs_score: 71.6,
+    tacticalNotes: 'Raw intent prodigy with 178.7 SR who attacks the first 10 balls unconditionally.',
+    strengths: ['Over-the-top hitting in powerplay', 'Elite bat velocity'],
+    weaknesses: ['High risk dismissal rate in low targets']
+  },
+  {
+    rank: 17,
+    player_id: '7897',
+    player_name: 'Tilak Varma',
+    nationality: 'India',
+    role: 'Top-Order Batter',
+    total_matches: 108,
+    total_runs: 3156,
+    total_balls: 2196,
+    career_sr: '143.7',
+    total_wkts: 6,
+    legal_overs: '27.2',
+    career_econ: '7.77',
+    n_press: 84,
+    eb_avg_press: 39.8,
+    eb_sr_press: 147.8,
+    eb_econ_press: 8.15,
+    eb_bowlsr_press: 18.8,
+    p_flop: 0,
+    p_pad: 3.2,
+    b_vol: 5.0,
+    b_pedigree: 3.5,
+    hl_prs_score: 71.0,
+    is_high_baseline: true,
+    tacticalNotes: 'Southpaw anchor with back-to-back international T20I centuries under severe crisis situations.',
+    strengths: ['Immaculate technique under collapse', 'Off-spin match-up weapon', 'High volume experience'],
+    weaknesses: ['Minor slow-anchor penalty (-3.2)']
+  },
+  {
+    rank: 18,
+    player_id: '68311',
+    player_name: 'Akhil Rawat',
+    nationality: 'India',
+    role: 'Middle-Order Finisher',
+    total_matches: 24,
+    total_runs: 580,
+    total_balls: 364,
+    career_sr: '159.3',
+    total_wkts: 0,
+    legal_overs: '0.0',
+    career_econ: '0.00',
+    n_press: 18,
+    eb_avg_press: 34.3,
+    eb_sr_press: 159.3,
+    eb_econ_press: 8.15,
+    eb_bowlsr_press: 18.8,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 2.0,
+    b_pedigree: 0.8,
+    hl_prs_score: 70.3,
+    tacticalNotes: 'Dynamic finisher who scores 159.3 under pressure with strong bottom hand extension.',
+    strengths: ['Boundary clearing over long-on', 'Reliable chase finisher'],
+    weaknesses: ['Dot ball count against tight yorkers']
+  },
+  {
+    rank: 19,
+    player_id: '6288',
+    player_name: 'Shubman Gill',
+    nationality: 'India',
+    role: 'Top-Order Batter',
+    total_matches: 115,
+    total_runs: 4003,
+    total_balls: 2784,
+    career_sr: '143.8',
+    total_wkts: 0,
+    legal_overs: '0.0',
+    career_econ: '0.00',
+    n_press: 83,
+    eb_avg_press: 38.3,
+    eb_sr_press: 146.6,
+    eb_econ_press: 8.15,
+    eb_bowlsr_press: 18.8,
+    p_flop: 0,
+    p_pad: 1.3,
+    b_vol: 5.0,
+    b_pedigree: 3.5,
+    hl_prs_score: 69.7,
+    tacticalNotes: 'Classical anchor who elevates in high-stakes matches (38.3 pressure avg, 146.6 pressure SR).',
+    strengths: ['Elite boundary control through off-side', 'High match-winning percentage when crossing 40'],
+    weaknesses: ['Minor slow-anchor loss deduction (-1.3)']
+  },
+  {
+    rank: 20,
+    player_id: '4399',
+    player_name: 'Tim David',
+    nationality: 'Australia',
+    role: 'Middle-Order Finisher',
+    total_matches: 178,
+    total_runs: 4120,
+    total_balls: 2530,
+    career_sr: '162.8',
+    total_wkts: 2,
+    legal_overs: '6.0',
+    career_econ: '9.20',
+    n_press: 148,
+    eb_avg_press: 28.9,
+    eb_sr_press: 162.8,
+    eb_econ_press: 8.15,
+    eb_bowlsr_press: 18.8,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 6.4,
+    b_pedigree: 3.5,
+    hl_prs_score: 69.4,
+    tacticalNotes: 'Pure death overs enforcer with the highest volume leverage sample (148 pressure matches).',
+    strengths: ['Tremendous boundary power', 'Clears 90m straight ropes', 'Massive volume sample bonus'],
+    weaknesses: ['Vulnerable to slow gripping spinners on turning tracks']
+  }
+];
+
+// 2. ALL-PLAYER OPEN TOP 20 BOWLERS (HL-PRS v7)
+export const OPEN_TOP_20_BOWLERS: HLPRSPlayer[] = [
+  {
+    rank: 1,
+    player_id: '68312',
+    player_name: 'Pushparaj Sharma',
+    nationality: 'India',
+    role: 'Pace Bowler',
+    total_matches: 24,
+    total_runs: 45,
+    total_balls: 32,
+    career_sr: '140.6',
+    total_wkts: 34,
+    legal_overs: '82.4',
+    career_econ: '6.98',
+    n_press: 20,
+    eb_avg_press: 10.0,
+    eb_sr_press: 120.0,
+    eb_econ_press: 7.15,
+    eb_bowlsr_press: 12.3,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 2.4,
+    b_pedigree: 0.8,
+    hl_prs_score: 83.1,
+    tacticalNotes: 'Sensational domestic pace phenomenon. Strikes every 12.3 balls under pressure with 7.15 economy.',
+    strengths: ['Devastating dipping yorker', 'High release point extraction', 'Sub-7.2 RPO in pressure defenses'],
+    weaknesses: ['Limited sample against international batting units']
+  },
+  {
+    rank: 2,
+    player_id: '4900',
+    player_name: 'Wanindu Hasaranga',
+    nationality: 'Sri Lanka',
+    role: 'Wrist Spinner',
+    total_matches: 172,
+    total_runs: 1789,
+    total_balls: 1225,
+    career_sr: '146.0',
+    total_wkts: 286,
+    legal_overs: '612.0',
+    career_econ: '6.88',
+    n_press: 138,
+    eb_avg_press: 22.0,
+    eb_sr_press: 142.0,
+    eb_econ_press: 7.50,
+    eb_bowlsr_press: 14.0,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 6.0,
+    b_pedigree: 3.5,
+    hl_prs_score: 80.2,
+    tacticalNotes: 'World-class wicket taker in high-leverage situations. 286 career wickets with 14.0 strike rate under pressure.',
+    strengths: ['Googly deception against LHB', 'Middle overs wicket clusters', 'Lower order hitting utility'],
+    weaknesses: ['Prone to conceding boundary balls when flighting on flat decks']
+  },
+  {
+    rank: 3,
+    player_id: '68313',
+    player_name: 'Simranjeet Kang',
+    nationality: 'India',
+    role: 'Wrist Spinner',
+    total_matches: 28,
+    total_runs: 62,
+    total_balls: 51,
+    career_sr: '121.5',
+    total_wkts: 40,
+    legal_overs: '98.0',
+    career_econ: '7.22',
+    n_press: 24,
+    eb_avg_press: 10.0,
+    eb_sr_press: 110.0,
+    eb_econ_press: 7.78,
+    eb_bowlsr_press: 12.1,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 2.8,
+    b_pedigree: 0.8,
+    hl_prs_score: 78.5,
+    tacticalNotes: 'Mystery wrist spin weapon who takes wickets every 12.1 deliveries in crisis defenses.',
+    strengths: ['Unorthodox wrist action', 'Quick skid through the air', 'High dot ball percentage'],
+    weaknesses: ['Control in wet outfield dew conditions']
+  },
+  {
+    rank: 4,
+    player_id: '2933',
+    player_name: 'Jasprit Bumrah',
+    nationality: 'India',
+    role: 'Pace Bowler',
+    total_matches: 120,
+    total_runs: 56,
+    total_balls: 68,
+    career_sr: '82.3',
+    total_wkts: 115,
+    legal_overs: '448.2',
+    career_econ: '6.27',
+    n_press: 105,
+    eb_avg_press: 8.0,
+    eb_sr_press: 80.0,
+    eb_econ_press: 6.99,
+    eb_bowlsr_press: 16.0,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 4.5,
+    b_pedigree: 3.5,
+    hl_prs_score: 78.4,
+    tacticalNotes: 'Gold standard of T20 bowling. Sub-7.00 pressure economy across ICC World Cup and IPL playoffs.',
+    strengths: ['Hyperextension release deception', 'Pinpoint yorkers under maximum leverage', 'Boundary suppression'],
+    weaknesses: ['Opponents routinely play him out defensively, dampening wicket volume']
+  },
+  {
+    rank: 5,
+    player_id: '4722',
+    player_name: 'Rashid Khan',
+    nationality: 'Afghanistan',
+    role: 'Wrist Spinner',
+    total_matches: 198,
+    total_runs: 1620,
+    total_balls: 1110,
+    career_sr: '145.9',
+    total_wkts: 326,
+    legal_overs: '744.0',
+    career_econ: '6.45',
+    n_press: 162,
+    eb_avg_press: 18.0,
+    eb_sr_press: 140.0,
+    eb_econ_press: 7.02,
+    eb_bowlsr_press: 16.7,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 6.7,
+    b_pedigree: 3.5,
+    hl_prs_score: 78.0,
+    tacticalNotes: 'The premier global franchise match-winner. 326 wickets with unmatched 7.02 pressure economy.',
+    strengths: ['100 kph wrong-un', 'Stump to stump strangle', 'Big-game pressure pedigree'],
+    weaknesses: ['Can be slog-swept on small ground dimensions']
+  },
+  {
+    rank: 6,
+    player_id: '1589',
+    player_name: 'Imran Tahir',
+    nationality: 'South Africa',
+    role: 'Wrist Spinner',
+    total_matches: 124,
+    total_runs: 110,
+    total_balls: 120,
+    career_sr: '91.6',
+    total_wkts: 185,
+    legal_overs: '462.0',
+    career_econ: '6.95',
+    n_press: 98,
+    eb_avg_press: 8.0,
+    eb_sr_press: 85.0,
+    eb_econ_press: 7.35,
+    eb_bowlsr_press: 15.5,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 5.5,
+    b_pedigree: 2.5,
+    hl_prs_score: 76.0,
+    tacticalNotes: 'Ageless match-winner with 7.35 pressure economy and high strike rate across global franchise finals.',
+    strengths: ['Relentless competitive fire', 'Flatter googly', 'Middle overs wicket threat'],
+    weaknesses: ['Fielding range and running mobility']
+  },
+  {
+    rank: 7,
+    player_id: '68314',
+    player_name: 'Dushan Hemantha',
+    nationality: 'Sri Lanka',
+    role: 'Wrist Spinner',
+    total_matches: 32,
+    total_runs: 180,
+    total_balls: 142,
+    career_sr: '126.7',
+    total_wkts: 42,
+    legal_overs: '92.0',
+    career_econ: '7.85',
+    n_press: 26,
+    eb_avg_press: 12.0,
+    eb_sr_press: 115.0,
+    eb_econ_press: 8.21,
+    eb_bowlsr_press: 12.1,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 2.9,
+    b_pedigree: 1.0,
+    hl_prs_score: 75.3,
+    tacticalNotes: 'Attacking leg-spinner with 12.1 pressure strike rate who deceived top orders in Emerging Asia Cup.',
+    strengths: ['High flight and sharp turn', 'Strike capability under leverage'],
+    weaknesses: ['Economy control on true batting pitches']
+  },
+  {
+    rank: 8,
+    player_id: '68315',
+    player_name: 'Abrar Ahmed',
+    nationality: 'Pakistan',
+    role: 'Mystery Spinner',
+    total_matches: 44,
+    total_runs: 75,
+    total_balls: 68,
+    career_sr: '110.2',
+    total_wkts: 68,
+    legal_overs: '162.0',
+    career_econ: '7.30',
+    n_press: 36,
+    eb_avg_press: 8.0,
+    eb_sr_press: 90.0,
+    eb_econ_press: 7.65,
+    eb_bowlsr_press: 15.8,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 3.7,
+    b_pedigree: 1.25,
+    hl_prs_score: 70.7,
+    tacticalNotes: 'Finger-flick mystery spinner who maintains 7.65 economy when opposing batters are charging.',
+    strengths: ['Carrom ball and disguised seam', 'Attacking lines to right-handers'],
+    weaknesses: ['Handling wet ball under heavy dew']
+  },
+  {
+    rank: 9,
+    player_id: '1556',
+    player_name: 'David Payne',
+    nationality: 'England',
+    role: 'Pace Bowler',
+    total_matches: 88,
+    total_runs: 176,
+    total_balls: 144,
+    career_sr: '122.2',
+    total_wkts: 125,
+    legal_overs: '318.0',
+    career_econ: '7.60',
+    n_press: 68,
+    eb_avg_press: 10.0,
+    eb_sr_press: 105.0,
+    eb_econ_press: 7.80,
+    eb_bowlsr_press: 15.6,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 4.5,
+    b_pedigree: 1.5,
+    hl_prs_score: 68.5,
+    tacticalNotes: 'Left-arm death seamer with immaculate back-of-the-hand slower balls and wide yorker execution.',
+    strengths: ['Left-arm angle across right-handers', '15.6 pressure strike rate', 'Vitality Blast and BBL proven'],
+    weaknesses: ['Can be targeted if pace drops below 130 kph']
+  },
+  {
+    rank: 10,
+    player_id: '68316',
+    player_name: 'Noor Ahmad',
+    nationality: 'Afghanistan',
+    role: 'Wrist Spinner',
+    total_matches: 112,
+    total_runs: 110,
+    total_balls: 130,
+    career_sr: '84.6',
+    total_wkts: 185,
+    legal_overs: '412.0',
+    career_econ: '7.18',
+    n_press: 94,
+    eb_avg_press: 8.0,
+    eb_sr_press: 80.0,
+    eb_econ_press: 7.52,
+    eb_bowlsr_press: 17.7,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 5.8,
+    b_pedigree: 2.5,
+    hl_prs_score: 68.3,
+    tacticalNotes: 'Left-arm unorthodox wrist spinner who bowls flat at 98 kph to choke middle overs.',
+    strengths: ['Hard to pick wrong-un', 'Exceptional middle overs control in IPL'],
+    weaknesses: ['Vulnerable when batters sweep from outside off']
+  },
+  {
+    rank: 11,
+    player_id: '1588',
+    player_name: 'Tim Southee',
+    nationality: 'New Zealand',
+    role: 'Pace Bowler',
+    total_matches: 96,
+    total_runs: 240,
+    total_balls: 170,
+    career_sr: '141.1',
+    total_wkts: 119,
+    legal_overs: '354.0',
+    career_econ: '7.85',
+    n_press: 74,
+    eb_avg_press: 10.0,
+    eb_sr_press: 115.0,
+    eb_econ_press: 7.98,
+    eb_bowlsr_press: 15.7,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 4.5,
+    b_pedigree: 3.5,
+    hl_prs_score: 68.1,
+    tacticalNotes: 'Veteran swing and seam bowler with 119 wickets across ICC knockouts and T20 World Cups.',
+    strengths: ['Outswing in powerplay', 'Cutter into pitch at death', 'Vast knockout experience'],
+    weaknesses: ['Economy spikes on flat subcontinent pitches']
+  },
+  {
+    rank: 12,
+    player_id: '7240',
+    player_name: 'FazalHaq Farooqi',
+    nationality: 'Afghanistan',
+    role: 'Pace Bowler',
+    total_matches: 104,
+    total_runs: 48,
+    total_balls: 52,
+    career_sr: '92.3',
+    total_wkts: 179,
+    legal_overs: '382.0',
+    career_econ: '7.12',
+    n_press: 88,
+    eb_avg_press: 8.0,
+    eb_sr_press: 85.0,
+    eb_econ_press: 7.75,
+    eb_bowlsr_press: 16.9,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 5.6,
+    b_pedigree: 2.5,
+    hl_prs_score: 67.9,
+    tacticalNotes: 'Leading wicket taker of ICC T20 World Cup 2024. Lethal inswinger against right-handed openers.',
+    strengths: ['New-ball powerplay breakthroughs', 'Skiddy yorkers under lights'],
+    weaknesses: ['Death over control when swing disappears']
+  },
+  {
+    rank: 13,
+    player_id: '3174',
+    player_name: 'Matt Henry',
+    nationality: 'New Zealand',
+    role: 'Pace Bowler',
+    total_matches: 68,
+    total_runs: 73,
+    total_balls: 62,
+    career_sr: '117.7',
+    total_wkts: 81,
+    legal_overs: '242.0',
+    career_econ: '8.10',
+    n_press: 52,
+    eb_avg_press: 8.0,
+    eb_sr_press: 90.0,
+    eb_econ_press: 8.70,
+    eb_bowlsr_press: 13.0,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 3.6,
+    b_pedigree: 3.5,
+    hl_prs_score: 67.8,
+    tacticalNotes: 'Express strike bowler striking every 13.0 balls under leverage with upright seam presentation.',
+    strengths: ['Hit-the-deck heavy length', 'Extra bounce on Jaipur surface', 'Strike weapon in first 6 overs'],
+    weaknesses: ['Death over economy can elevate if yorker misses']
+  },
+  {
+    rank: 14,
+    player_id: '4398',
+    player_name: 'Tabraiz Shamsi',
+    nationality: 'South Africa',
+    role: 'Wrist Spinner',
+    total_matches: 118,
+    total_runs: 45,
+    total_balls: 58,
+    career_sr: '77.5',
+    total_wkts: 160,
+    legal_overs: '420.0',
+    career_econ: '7.45',
+    n_press: 82,
+    eb_avg_press: 8.0,
+    eb_sr_press: 80.0,
+    eb_econ_press: 7.99,
+    eb_bowlsr_press: 16.1,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 5.2,
+    b_pedigree: 2.5,
+    hl_prs_score: 67.5,
+    tacticalNotes: 'Former World No. 1 T20I bowler with attacking chinaman trajectory and wrong-un mastery.',
+    strengths: ['Difficult release angle', 'Googly against RHB', 'Knockout pressure experience'],
+    weaknesses: ['Can bleed extras when trying too many variations']
+  },
+  {
+    rank: 15,
+    player_id: '68317',
+    player_name: 'Muhammad Uzair Khan',
+    nationality: 'UAE',
+    role: 'Pace Bowler',
+    total_matches: 28,
+    total_runs: 35,
+    total_balls: 32,
+    career_sr: '109.3',
+    total_wkts: 34,
+    legal_overs: '84.0',
+    career_econ: '8.12',
+    n_press: 22,
+    eb_avg_press: 8.0,
+    eb_sr_press: 85.0,
+    eb_econ_press: 8.69,
+    eb_bowlsr_press: 12.2,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 2.4,
+    b_pedigree: 0.8,
+    hl_prs_score: 67.0,
+    tacticalNotes: 'Left-arm skiddy seamer striking every 12.2 balls in Associate and regional franchise shootouts.',
+    strengths: ['Nippy bouncers', 'Awkward angle into right-hander pads'],
+    weaknesses: ['Discipline under dew']
+  },
+  {
+    rank: 16,
+    player_id: '4756',
+    player_name: 'R. Sai Kishore',
+    nationality: 'India',
+    role: 'Finger Spinner',
+    total_matches: 72,
+    total_runs: 120,
+    total_balls: 110,
+    career_sr: '109.0',
+    total_wkts: 95,
+    legal_overs: '264.0',
+    career_econ: '6.82',
+    n_press: 58,
+    eb_avg_press: 8.0,
+    eb_sr_press: 90.0,
+    eb_econ_press: 8.20,
+    eb_bowlsr_press: 15.0,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 4.2,
+    b_pedigree: 1.15,
+    hl_prs_score: 66.6,
+    tacticalNotes: 'Tall slow left-arm orthodox bowler extracting steep overspin and bounce.',
+    strengths: ['High release point', 'Low dot-ball concession rate', 'Powerplay bowling capability'],
+    weaknesses: ['Excluded from RR primary targets due to redundant left-arm spin depth']
+  },
+  {
+    rank: 17,
+    player_id: '4397',
+    player_name: 'Nathan Ellis',
+    nationality: 'Australia',
+    role: 'Pace Bowler',
+    total_matches: 136,
+    total_runs: 140,
+    total_balls: 118,
+    career_sr: '118.6',
+    total_wkts: 181,
+    legal_overs: '488.0',
+    career_econ: '7.85',
+    n_press: 112,
+    eb_avg_press: 8.0,
+    eb_sr_press: 95.0,
+    eb_econ_press: 8.18,
+    eb_bowlsr_press: 16.0,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 5.4,
+    b_pedigree: 2.5,
+    hl_prs_score: 66.0,
+    tacticalNotes: 'Renowned death specialist with back-of-the-hand slower balls and accurate yorkers.',
+    strengths: ['Pinpoint wide line yorker execution', 'Deceptive slower balls', 'High volume T20 sample'],
+    weaknesses: ['Pace vulnerability on bouncy wickets']
+  },
+  {
+    rank: 18,
+    player_id: '68318',
+    player_name: 'Sufiyan Muqeem',
+    nationality: 'Pakistan',
+    role: 'Wrist Spinner',
+    total_matches: 26,
+    total_runs: 22,
+    total_balls: 24,
+    career_sr: '91.6',
+    total_wkts: 31,
+    legal_overs: '78.0',
+    career_econ: '7.45',
+    n_press: 20,
+    eb_avg_press: 8.0,
+    eb_sr_press: 85.0,
+    eb_econ_press: 8.15,
+    eb_bowlsr_press: 15.4,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 2.7,
+    b_pedigree: 1.0,
+    hl_prs_score: 65.4,
+    tacticalNotes: 'Left-arm unorthodox wrist spinner with sharp bounce and deception.',
+    strengths: ['Difficult to read off hand', 'High dot ball percentage'],
+    weaknesses: ['Control when fielders are in the ring']
+  },
+  {
+    rank: 19,
+    player_id: '1587',
+    player_name: 'Moeen Ali',
+    nationality: 'England',
+    role: 'All-Rounder',
+    total_matches: 146,
+    total_runs: 2890,
+    total_balls: 2035,
+    career_sr: '142.0',
+    total_wkts: 142,
+    legal_overs: '388.0',
+    career_econ: '7.35',
+    n_press: 118,
+    eb_avg_press: 24.0,
+    eb_sr_press: 138.0,
+    eb_econ_press: 7.88,
+    eb_bowlsr_press: 17.5,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 5.9,
+    b_pedigree: 3.5,
+    hl_prs_score: 65.0,
+    tacticalNotes: 'Veteran off-spinner and pinch hitter with 142 wickets and 2 T20 World Cup medals.',
+    strengths: ['Tight lines to left-handers in powerplay', 'Elite pedigree multiplier'],
+    weaknesses: ['Batting strike rate slowdown against high pace']
+  },
+  {
+    rank: 20,
+    player_id: '68319',
+    player_name: 'Rachin Ravindra',
+    nationality: 'New Zealand',
+    role: 'All-Rounder',
+    total_matches: 38,
+    total_runs: 840,
+    total_balls: 590,
+    career_sr: '142.3',
+    total_wkts: 28,
+    legal_overs: '86.0',
+    career_econ: '7.60',
+    n_press: 32,
+    eb_avg_press: 28.0,
+    eb_sr_press: 139.0,
+    eb_econ_press: 8.23,
+    eb_bowlsr_press: 15.5,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 3.4,
+    b_pedigree: 2.5,
+    hl_prs_score: 64.9,
+    tacticalNotes: 'Dynamic Kiwi southpaw all-rounder striking every 15.5 balls with left-arm orthodox darts.',
+    strengths: ['Clean timing through the V', 'Accurate stump-to-stump bowling'],
+    weaknesses: ['Excluded from RR primary target board due to top-order and left-arm spin surplus']
+  }
+];
+
+// 3. RAJASTHAN ROYALS IPL 2027 TARGET BOARD (14 TARGETS)
+// Filtered strictly for Officially Released (Nov 17, 2026) + Uncontracted Indian Domestic Gems
+// Mapped strictly to RR's 5 open squad gaps (excluding redundant openers and SLA spinners)
+export const RR_AUCTION_TARGET_BOARD: HLPRSPlayer[] = [
+  {
+    rank: 1,
+    player_id: '6554',
+    player_name: 'Salman Nizar',
+    nationality: 'India',
+    role: 'Middle-Order Finisher',
+    targetRole: '2. Dynamic Lower-Order Finisher / Spin Destroyer',
+    tier: 'Uncontracted Domestic Gem',
+    contractStatus: 'Uncapped Domestic',
+    recommendedMaxBid: 2.60,
+    total_matches: 62,
+    total_runs: 1458,
+    total_balls: 966,
+    career_sr: '150.9',
+    total_wkts: 1,
+    legal_overs: '2.0',
+    career_econ: '8.00',
+    n_press: 48,
+    eb_avg_press: 55.9,
+    eb_sr_press: 150.9,
+    eb_econ_press: 8.15,
+    eb_bowlsr_press: 18.8,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 3.2,
+    b_pedigree: 0.8,
+    hl_prs_score: 86.5,
+    tacticalNotes: 'Supreme value pick. 55.9 pressure average under severe collapse situations. Perfect bridge between Samson and Hetmyer.',
+    strengths: ['Top 1% domestic crisis recovery average', 'Demolishes spin in middle overs', 'Zero knockout flop history'],
+    weaknesses: ['Purely domestic tracking, needs IPL camp facing 145+ kph bowling']
+  },
+  {
+    rank: 2,
+    player_id: '4900',
+    player_name: 'Wanindu Hasaranga',
+    nationality: 'Sri Lanka',
+    role: 'Wrist Spinner',
+    targetRole: '3. Mystery Wrist Spinner / Attacking Leg-Spinner',
+    tier: 'Released Overseas Elite',
+    contractStatus: 'Released Nov 17, 2026',
+    recommendedMaxBid: 7.20,
+    total_matches: 172,
+    total_runs: 1789,
+    total_balls: 1225,
+    career_sr: '146.0',
+    total_wkts: 286,
+    legal_overs: '612.0',
+    career_econ: '6.88',
+    n_press: 138,
+    eb_avg_press: 22.0,
+    eb_sr_press: 142.0,
+    eb_econ_press: 7.50,
+    eb_bowlsr_press: 14.0,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 6.0,
+    b_pedigree: 3.5,
+    hl_prs_score: 80.2,
+    tacticalNotes: 'Released marquee target. Ideal replacement for Yuzvendra Chahal. 286 career wickets with 14.0 strike rate under pressure.',
+    strengths: ['Googly deception against LHB', 'Sub-7.50 pressure economy', 'Valuable #8 power hitting'],
+    weaknesses: ['Premium purse commitment (₹7.20 Cr ceiling)']
+  },
+  {
+    rank: 3,
+    player_id: '58135',
+    player_name: 'Tejasvi Dahiya',
+    nationality: 'India',
+    role: 'Wicketkeeper-Batter',
+    targetRole: '5. Dynamic Power Middle-Order / Backup WK-Batter',
+    tier: 'Uncontracted Domestic Gem',
+    contractStatus: 'Uncapped Domestic',
+    recommendedMaxBid: 2.20,
+    total_matches: 26,
+    total_runs: 547,
+    total_balls: 352,
+    career_sr: '155.4',
+    total_wkts: 0,
+    legal_overs: '0.0',
+    career_econ: '0.00',
+    n_press: 21,
+    eb_avg_press: 32.5,
+    eb_sr_press: 155.4,
+    eb_econ_press: 8.15,
+    eb_bowlsr_press: 18.8,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 2.1,
+    b_pedigree: 0.8,
+    hl_prs_score: 69.1,
+    tacticalNotes: 'Dynamic Delhi keeper-batter with 155.4 pressure strike rate. Provides backup for Sanju Samson and middle-order spark.',
+    strengths: ['Clean pickup sweep over midwicket', 'Sub-0.18s stumping reflex', 'Zero stat-padding tendency'],
+    weaknesses: ['Needs exposure to express 145 kph bouncers']
+  },
+  {
+    rank: 4,
+    player_id: '1556',
+    player_name: 'David Payne',
+    nationality: 'England',
+    role: 'Pace Bowler',
+    targetRole: '1. Domestic/Overseas Death Pacer',
+    tier: 'Released Left-Arm Seam Specialist',
+    contractStatus: 'Released Nov 17, 2026',
+    recommendedMaxBid: 3.80,
+    total_matches: 88,
+    total_runs: 176,
+    total_balls: 144,
+    career_sr: '122.2',
+    total_wkts: 125,
+    legal_overs: '318.0',
+    career_econ: '7.60',
+    n_press: 68,
+    eb_avg_press: 10.0,
+    eb_sr_press: 105.0,
+    eb_econ_press: 7.80,
+    eb_bowlsr_press: 15.6,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 4.5,
+    b_pedigree: 1.5,
+    hl_prs_score: 68.5,
+    tacticalNotes: 'High-leverage death specialist. Left-arm angle and back-of-hand slower balls suit Jaipur 71m square boundaries.',
+    strengths: ['Sub-7.80 pressure economy', 'Left-arm diagonal angle', 'Pinpoint wide yorker execution'],
+    weaknesses: ['Overseas slot consumption']
+  },
+  {
+    rank: 5,
+    player_id: '3174',
+    player_name: 'Matt Henry',
+    nationality: 'New Zealand',
+    role: 'Pace Bowler',
+    targetRole: '1. Domestic/Overseas Death Pacer',
+    tier: 'Released Express Quick',
+    contractStatus: 'Released Nov 17, 2026',
+    recommendedMaxBid: 4.60,
+    total_matches: 68,
+    total_runs: 73,
+    total_balls: 62,
+    career_sr: '117.7',
+    total_wkts: 81,
+    legal_overs: '242.0',
+    career_econ: '8.10',
+    n_press: 52,
+    eb_avg_press: 8.0,
+    eb_sr_press: 90.0,
+    eb_econ_press: 8.70,
+    eb_bowlsr_press: 13.0,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 3.6,
+    b_pedigree: 3.5,
+    hl_prs_score: 67.8,
+    tacticalNotes: 'Released express pacer striking every 13.0 balls under leverage. Extracts steep bounce from Sawai Mansingh Stadium pitch.',
+    strengths: ['Hit-the-deck heavy length', 'New-ball penetration', 'Proven ICC tournament temperament'],
+    weaknesses: ['Requires precise field setting when bowling death overs']
+  },
+  {
+    rank: 6,
+    player_id: '6461',
+    player_name: 'Mayank Rawat',
+    nationality: 'India',
+    role: 'All-Rounder',
+    targetRole: '4. Pace-Bowling All-Rounder / Seam Utility',
+    tier: 'Uncontracted Domestic Gem',
+    contractStatus: 'Uncapped Domestic',
+    recommendedMaxBid: 2.80,
+    total_matches: 34,
+    total_runs: 638,
+    total_balls: 412,
+    career_sr: '154.8',
+    total_wkts: 19,
+    legal_overs: '68.0',
+    career_econ: '7.85',
+    n_press: 26,
+    eb_avg_press: 29.4,
+    eb_sr_press: 154.8,
+    eb_econ_press: 8.10,
+    eb_bowlsr_press: 16.5,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 2.5,
+    b_pedigree: 0.8,
+    hl_prs_score: 66.7,
+    tacticalNotes: 'Crucial domestic seam all-rounder. Bats with 154.8 SR and provides 2-3 reliable overs, easing overseas all-rounder reliance.',
+    strengths: ['Balanced dual capability', 'Clean bat speed over cow corner', 'Affordable valuation cap (₹2.80 Cr)'],
+    weaknesses: ['Bowling consistency on true batting tracks']
+  },
+  {
+    rank: 7,
+    player_id: '19781',
+    player_name: 'Mitchell Owen',
+    nationality: 'Australia',
+    role: 'All-Rounder',
+    targetRole: '4. Pace-Bowling All-Rounder / Seam Utility',
+    tier: 'Released Marquee',
+    contractStatus: 'Released Nov 17, 2026',
+    recommendedMaxBid: 5.40,
+    total_matches: 46,
+    total_runs: 1088,
+    total_balls: 710,
+    career_sr: '153.2',
+    total_wkts: 26,
+    legal_overs: '94.0',
+    career_econ: '8.40',
+    n_press: 36,
+    eb_avg_press: 28.5,
+    eb_sr_press: 153.2,
+    eb_econ_press: 8.45,
+    eb_bowlsr_press: 17.2,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 3.2,
+    b_pedigree: 1.5,
+    hl_prs_score: 66.2,
+    tacticalNotes: 'Tasmanian brute power hitter and 138 kph seam bowler. Released target capable of replacing Marcus Stoinis role.',
+    strengths: ['Monster boundary clearing arc', 'Heavy seam bowling in middle overs', 'BBL championship experience'],
+    weaknesses: ['Susceptible to sharp turning leg-breaks']
+  },
+  {
+    rank: 8,
+    player_id: '4211',
+    player_name: 'Vishnu Vinod',
+    nationality: 'India',
+    role: 'Wicketkeeper-Batter',
+    targetRole: '5. Dynamic Power Middle-Order / Backup WK-Batter',
+    tier: 'Released 360 Finisher',
+    contractStatus: 'Released Nov 17, 2026',
+    recommendedMaxBid: 3.20,
+    total_matches: 58,
+    total_runs: 1326,
+    total_balls: 928,
+    career_sr: '142.9',
+    total_wkts: 0,
+    legal_overs: '0.0',
+    career_econ: '0.00',
+    n_press: 44,
+    eb_avg_press: 28.0,
+    eb_sr_press: 142.9,
+    eb_econ_press: 8.15,
+    eb_bowlsr_press: 18.8,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 3.5,
+    b_pedigree: 1.15,
+    hl_prs_score: 64.3,
+    tacticalNotes: 'Kerala teammate of Sanju Samson. Dynamic 360-degree stroke maker who scored explosive domestic centuries.',
+    strengths: ['Reverse ramps and ramp scoops', 'Superb glovework behind stumps', 'Low risk bid profile'],
+    weaknesses: ['Can be tied down by wide outside-off balls']
+  },
+  {
+    rank: 9,
+    player_id: '32862',
+    player_name: 'Allah Ghazanfar',
+    nationality: 'Afghanistan',
+    role: 'Wrist Spinner',
+    targetRole: '3. Mystery Wrist Spinner / Attacking Leg-Spinner',
+    tier: 'Released Mystery Sensation',
+    contractStatus: 'Released Nov 17, 2026',
+    recommendedMaxBid: 4.80,
+    total_matches: 42,
+    total_runs: 104,
+    total_balls: 88,
+    career_sr: '118.2',
+    total_wkts: 67,
+    legal_overs: '154.0',
+    career_econ: '6.72',
+    n_press: 34,
+    eb_avg_press: 10.0,
+    eb_sr_press: 100.0,
+    eb_econ_press: 7.42,
+    eb_bowlsr_press: 14.8,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 3.1,
+    b_pedigree: 2.5,
+    hl_prs_score: 63.6,
+    tacticalNotes: '18-year-old mystery off-spinner/mystery wrist spinner with lethal carrom ball and drift. Released gem with immense upside.',
+    strengths: ['Unpickable carrom ball', 'Sub-6.80 career economy', 'Immense wicket-taking trajectory'],
+    weaknesses: ['Workload management in long campaigns']
+  },
+  {
+    rank: 10,
+    player_id: '56185',
+    player_name: 'Tanay Sanghvi',
+    nationality: 'India',
+    role: 'Pace Bowler',
+    targetRole: '1. Domestic/Overseas Death Pacer',
+    tier: 'Uncontracted Domestic Gem',
+    contractStatus: 'Uncapped Domestic',
+    recommendedMaxBid: 2.40,
+    total_matches: 36,
+    total_runs: 86,
+    total_balls: 72,
+    career_sr: '119.4',
+    total_wkts: 47,
+    legal_overs: '128.0',
+    career_econ: '7.45',
+    n_press: 28,
+    eb_avg_press: 8.0,
+    eb_sr_press: 90.0,
+    eb_econ_press: 8.05,
+    eb_bowlsr_press: 15.2,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 2.8,
+    b_pedigree: 0.8,
+    hl_prs_score: 58.5,
+    tacticalNotes: 'Saurashtra death over specialist who bowls disciplined yorkers and off-cutters under extreme pressure.',
+    strengths: ['Yorker accuracy under pressure', '47 domestic wickets with low boundary concession', 'High economy control'],
+    weaknesses: ['Lower pace (132-136 kph) requires precise field placement']
+  },
+  {
+    rank: 11,
+    player_id: '56559',
+    player_name: 'Kartik Chadha',
+    nationality: 'India',
+    role: 'Wrist Spinner',
+    targetRole: '3. Mystery Wrist Spinner / Attacking Leg-Spinner',
+    tier: 'Uncontracted Domestic Gem',
+    contractStatus: 'Uncapped Domestic',
+    recommendedMaxBid: 1.60,
+    total_matches: 20,
+    total_runs: 26,
+    total_balls: 28,
+    career_sr: '92.8',
+    total_wkts: 22,
+    legal_overs: '64.0',
+    career_econ: '7.60',
+    n_press: 16,
+    eb_avg_press: 8.0,
+    eb_sr_press: 85.0,
+    eb_econ_press: 8.35,
+    eb_bowlsr_press: 16.4,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 1.8,
+    b_pedigree: 0.8,
+    hl_prs_score: 51.2,
+    tacticalNotes: 'Uncapped wrist spinner who gets sharp skid off the deck. High budget-efficiency target for squad depth.',
+    strengths: ['Googly release disguise', 'Attacking trajectory', 'Cost-effective base bid (₹1.60 Cr)'],
+    weaknesses: ['Can drop short when batters advance']
+  },
+  {
+    rank: 12,
+    player_id: '7059',
+    player_name: 'Nehal Wadhera',
+    nationality: 'India',
+    role: 'Middle-Order Finisher',
+    targetRole: '2. Dynamic Lower-Order Finisher / Spin Destroyer',
+    tier: 'Released Domestic Power',
+    contractStatus: 'Released Nov 17, 2026',
+    recommendedMaxBid: 5.80,
+    total_matches: 64,
+    total_runs: 1425,
+    total_balls: 1012,
+    career_sr: '140.8',
+    total_wkts: 4,
+    legal_overs: '12.0',
+    career_econ: '8.80',
+    n_press: 48,
+    eb_avg_press: 28.5,
+    eb_sr_press: 140.8,
+    eb_econ_press: 8.15,
+    eb_bowlsr_press: 18.8,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 3.8,
+    b_pedigree: 1.15,
+    hl_prs_score: 51.0,
+    tacticalNotes: 'Southpaw finisher released on Nov 17. Powerful hitter of seam and spin through extra cover and midwicket.',
+    strengths: ['Left-handed match-up flexibility', 'Clean extension through the line', 'IPL playoff tested'],
+    weaknesses: ['Struggles against quality back-of-length pace at the body']
+  },
+  {
+    rank: 13,
+    player_id: '5951',
+    player_name: 'Pradeep Dadhe',
+    nationality: 'India',
+    role: 'Pace Bowler',
+    targetRole: '1. Domestic/Overseas Death Pacer',
+    tier: 'Uncontracted Domestic Gem',
+    contractStatus: 'Uncapped Domestic',
+    recommendedMaxBid: 1.80,
+    total_matches: 24,
+    total_runs: 0,
+    total_balls: 2,
+    career_sr: '0.0',
+    total_wkts: 29,
+    legal_overs: '84.0',
+    career_econ: '7.90',
+    n_press: 18,
+    eb_avg_press: 8.0,
+    eb_sr_press: 80.0,
+    eb_econ_press: 8.65,
+    eb_bowlsr_press: 16.8,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 1.9,
+    b_pedigree: 0.8,
+    hl_prs_score: 45.0,
+    tacticalNotes: 'Maharashtra fast bowler who bowls tight lines in powerplay and death. Low base price target.',
+    strengths: ['Hard length execution', '29 domestic wickets', 'Budget preservation pick'],
+    weaknesses: ['Limited lower-order batting capability']
+  },
+  {
+    rank: 14,
+    player_id: '3782',
+    player_name: 'M Shahrukh Khan',
+    nationality: 'India',
+    role: 'Middle-Order Finisher',
+    targetRole: '2. Dynamic Lower-Order Finisher / Spin Destroyer',
+    tier: 'Released Domestic Power',
+    contractStatus: 'Released Nov 17, 2026',
+    recommendedMaxBid: 6.80,
+    total_matches: 82,
+    total_runs: 1937,
+    total_balls: 1395,
+    career_sr: '138.8',
+    total_wkts: 49,
+    legal_overs: '162.0',
+    career_econ: '7.92',
+    n_press: 62,
+    eb_avg_press: 24.5,
+    eb_sr_press: 138.8,
+    eb_econ_press: 8.15,
+    eb_bowlsr_press: 18.8,
+    p_flop: 0,
+    p_pad: 0,
+    b_vol: 4.2,
+    b_pedigree: 1.15,
+    hl_prs_score: 45.0,
+    tacticalNotes: 'Premier Indian power finisher released on Nov 17. Also offers 2-3 handy off-spin overs with 49 domestic wickets.',
+    strengths: ['Brute muscular power over long-off', 'High boundary conversion in final 3 overs', 'Off-spin match-up weapon against LHB'],
+    weaknesses: ['Lower consistency on spinning tracks']
+  }
+];
+
+export const HL_PRS_V7_DOCUMENTATION = {
+  version: 'HL-PRS v7 (T20 Pressure & Reliability Engine)',
+  author: 'Rajasthan Royals SupeRR Selector Season 2 Challenge',
+  totalPlayersAnalyzed: 7824,
+  matchesAnalyzed: 5086,
+  competitionsAnalyzed: 287,
+  pipelineStages: [
+    {
+      stage: 'Stage 1: Forensic Data Cleaning & Pre-Processing',
+      fixes: [
+        'Super Over Nx Multiplication Bug Fix: Grouped player_match_stats.csv by (match_id, player_id) to count duplicate rows (dup_N) across all 16 Super Over matches. Divided runs, balls, fours, sixes by dup_N before deduplicating.',
+        'Base-10 Fractional Over Fix: Converted overs_bowled to true legal balls = min(24, int(overs)*6 + round((overs-int(overs))*10)), discarding the buggy raw economy_rate column.',
+        'Stage String Hygiene & True Knockout Definition: Trimmed whitespace and strictly defined is_true_knockout = 1 for Final, Qualifier, Semi Final, Eliminator, and Quarter Final, explicitly excluding round-robin Super 4 games.',
+        'Team Resolution: Joined player_competition_team_mapping on (player_id, comp_id) and filtered against matches home/away team IDs.'
+      ]
+    },
+    {
+      stage: 'Stage 2: Multiplicative Match Leverage Weight (L_i)',
+      formula: 'L_i = W_{comp, i} * M_{stage, i} * M_{situation, i}',
+      weights: [
+        'W_comp: ICC T20 World Cup & Asia Cup (1.35x), Bilateral T20I (1.25x), IPL (1.15x), Emerging A Teams (1.00x), Major Overseas Franchise (0.95x), SMAT Elite (0.82x), State T20 Leagues (0.70x), Minor Plate (0.58x)',
+        'M_stage: Final (1.50x), Semi/Qualifier/Eliminator (1.35x), QF (1.25x), Super 4 (1.10x), League (1.00x)',
+        'M_situation Batting: Base 1.00 + Severe Collapse (+0.55) / Standard (+0.35) + Winning 200+ Chase (+0.55) / 175+ (+0.30) + Ultra-Close (+0.45) / Close (+0.25) + POTM (+0.20)',
+        'M_situation Bowling: Base 1.00 + Winning Low-Total Defense <=160 (+0.55) / Attempt (+0.35) + Shootout Par Econ >=9.20 (+0.35) + Ultra-Close (+0.45) / Close (+0.25) + POTM (+0.20)'
+      ]
+    },
+    {
+      stage: 'Stage 3: Empirical Bayes Shrinkage & Asymmetric Baseline Protection',
+      formula: 'EB_Avg_w = (R_w + 12*km*24.5) / (O_w + 12*km),  EB_SR_w = ((R_w + 1.5*km*135.5) / (B_w + 150*km)) * 100',
+      rule: 'Asymmetric Baseline Protection: High-baseline stars (Pressure Avg >= 30.0, Pressure SR >= 148.0, P_pad < 0.5) are insulated from negative relative deltas while earning positive pressure elevation bonuses.'
+    },
+    {
+      stage: 'Stage 4: Habitual Knockout Flop Penalty (-P_flop)',
+      formula: 'P_flop = min(14.0, 0.85 * sum(S_flop) + 6.0 * max(0, R_flop - 0.38)*sqrt(N_KO) - 1.5 * N_KO_Hero)',
+      trigger: 'Triggered when N_KO >= 3 and R_flop >= 45% with sub-25 average or >=8.50 economy in elimination matches.'
+    },
+    {
+      stage: 'Stage 5: Rate-Normalized Stat-Padding & Slow-Anchor Penalty (-P_pad)',
+      formula: 'P_pad = min(14.0, 0.22*max(0, R_slow_20b - 20) + 0.65*max(0, R_pad_loss - 4) + 2.0*max(0, Cost - 1.0) + 0.45*max(0, 138.0 - SR_career))',
+      trigger: 'Penalizes batters facing >=20 balls at <= -12.0 SR points below match par, especially when leading to team losses.'
+    },
+    {
+      stage: 'Stage 6: Logarithmic Volume Bonus (+B_vol) & Final Score',
+      formula: 'B_vol = 1.35 * ln(1 + N_press / 8) + 0.65 * ln(1 + N_impact / 5)',
+      composite: 'Final HL-PRS v7 = Base HL-PRS - P_flop - P_pad + B_pedigree + B_vol'
+    }
+  ]
+};

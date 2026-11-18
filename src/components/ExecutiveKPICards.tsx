@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { Users, Crosshair, Zap, DollarSign } from 'lucide-react';
-import { EXECUTIVE_KPIS } from '@/data/players';
 
 interface ExecutiveKPICardsProps {
   selectedPlayersCount: number;
@@ -18,55 +17,55 @@ export default function ExecutiveKPICards({
   const cards = [
     {
       id: 'total-analyzed',
-      title: 'Total Domestic Players Analyzed',
-      value: EXECUTIVE_KPIS.totalDomesticPlayersAnalyzed.toLocaleString(),
-      subtext: 'Scouted across SMAT, VHT, DPL, Ranji & U19',
-      badge: 'Tier-1 Coverage',
+      title: 'T20 Players Evaluated (HL-PRS v7)',
+      value: '7,824',
+      subtext: '5,086 matches & 287 competitions analyzed',
+      badge: 'T20-Only Strict',
       badgeColor: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
       icon: Users,
       iconColor: 'text-blue-400',
       accentGlow: 'hover:border-blue-500/40',
-      metricDetail: '842 players -> 10 elite targets',
-      statChange: '+14% data volume vs 2025'
+      metricDetail: '16 Super Over bug fixed (dup_N div)',
+      statChange: '4.1+ frac overs corrected'
     },
     {
       id: 'shortlist',
-      title: 'Top Uncapped Shortlist',
-      value: `${selectedPlayersCount} / ${EXECUTIVE_KPIS.shortlistCount}`,
-      subtext: 'High-conviction recruits tailored for RR squad holes',
-      badge: '99th Percentile',
+      title: 'RR IPL 2027 Target Board',
+      value: `${selectedPlayersCount} / 14 Targets`,
+      subtext: 'Released Nov 17, 2026 + Uncontracted Gems',
+      badge: '5 Squad Gaps',
       badgeColor: 'bg-[#EA1A85]/15 text-[#EA1A85] border-[#EA1A85]/30',
       icon: Crosshair,
       iconColor: 'text-[#EA1A85]',
       accentGlow: 'hover:border-[#EA1A85]/50 glow-pink',
-      metricDetail: 'Tactical role coverage: 6/6 key areas',
-      statChange: '100% video & ball-tracking verified'
+      metricDetail: 'Excludes redundant openers & SLA',
+      statChange: '100% gap aligned'
     },
     {
       id: 'pressure-score',
-      title: 'Avg. Pressure Impact Score',
-      value: `${(avgSelectedPressure || EXECUTIVE_KPIS.avgPressureImpactScore).toFixed(1)} / 100`,
-      subtext: 'Weighted Win Probability Added (WPA) under leverage',
-      badge: 'Clutch Tested',
+      title: 'Avg. HL-PRS v7 Score',
+      value: `${avgSelectedPressure.toFixed(1)} / 100`,
+      subtext: 'Empirical Bayes with asymmetric baseline protection',
+      badge: 'Clutch Calibrated',
       badgeColor: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
       icon: Zap,
       iconColor: 'text-emerald-400',
       accentGlow: 'hover:border-emerald-500/40',
-      metricDetail: '+26.4 pts above domestic median (63.2)',
-      statChange: 'Death phase multiplier 1.45x'
+      metricDetail: 'Knockout Flop (-P_flop) & Pad (-P_pad) docked',
+      statChange: 'Log volume bonus (+B_vol)'
     },
     {
       id: 'purse-allocation',
       title: 'Target Auction Purse Allocation',
       value: `₹${totalAllocatedBudget.toFixed(2)} Cr`,
-      subtext: `Projected budget of ₹${EXECUTIVE_KPIS.totalPurseBudget.toFixed(2)} Cr remaining purse`,
-      badge: `${((totalAllocatedBudget / EXECUTIVE_KPIS.totalPurseBudget) * 100).toFixed(0)}% Purse Cap`,
+      subtext: 'Of ₹34.50 Cr total Rajasthan Royals purse',
+      badge: `${Math.round((totalAllocatedBudget / 34.50) * 100)}% Cap`,
       badgeColor: 'bg-[#F59E0B]/15 text-[#F59E0B] border-[#F59E0B]/30',
       icon: DollarSign,
       iconColor: 'text-[#F59E0B]',
       accentGlow: 'hover:border-[#F59E0B]/50 glow-gold',
-      metricDetail: `₹${(EXECUTIVE_KPIS.totalPurseBudget - totalAllocatedBudget).toFixed(2)} Cr reserve for Overseas/Marquee`,
-      statChange: 'Value-optimized cap model'
+      metricDetail: `₹${(34.50 - totalAllocatedBudget).toFixed(2)} Cr reserve cushion preserved`,
+      statChange: 'Value-optimized'
     }
   ];
 
@@ -79,7 +78,6 @@ export default function ExecutiveKPICards({
             key={card.id}
             className={`group relative overflow-hidden rounded-xl border border-slate-800 bg-[#1E293B]/90 p-5 shadow-lg transition-all duration-300 ${card.accentGlow}`}
           >
-            {/* Ambient Background Gradient Accent */}
             <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-slate-700/20 blur-2xl group-hover:bg-[#EA1A85]/10 transition-colors" />
 
             <div className="flex items-start justify-between">
