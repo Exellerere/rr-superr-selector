@@ -21,9 +21,9 @@ export default function AuctionSimulator({
 }: AuctionSimulatorProps) {
   const [copied, setCopied] = useState(false);
 
-  const totalPurse = 34.50; // ₹34.50 Cr total RR Purse
-  const totalSlots = 8; // 8 slots to fill
-  const targetUncappedCap = 18.00; // ₹18.00 Cr targeted spend for these tactical gaps
+  const totalPurse = 27.05; // ₹27.05 Cr total RR Purse (Nov 17, 2026 Official List)
+  const totalSlots = 6; // 6 open squad slots to fill
+  const targetUncappedCap = 15.00; // ₹15.00 Cr targeted spend for domestic gems
 
   const totalSpent = selectedPlayers.reduce((sum, p) => sum + (p.recommendedMaxBid || 0), 0);
   const remainingTotalPurse = totalPurse - totalSpent;
@@ -65,7 +65,7 @@ ${selectedPlayers.map((p, i) => `${i + 1}. ${p.player_name} (${p.nationality}) -
               HL-PRS v7 Auction Purse Optimizer
             </span>
             <span className="text-xs text-slate-400 font-mono">
-              RR Auction Purse: ₹{totalPurse.toFixed(2)} Cr • 8 Slots
+              RR Auction Purse: ₹{totalPurse.toFixed(2)} Cr • {totalSlots} Open Slots (Official Nov 17, 2026 List)
             </span>
           </div>
           <h2 className="mt-2 text-xl font-black text-white tracking-tight">

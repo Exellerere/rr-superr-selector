@@ -1,0 +1,907 @@
+RAJASTHAN ROYALS • SUPERR SELECTOR SEASON 2 (ROUND 1 METHODOLOGY REPORT)
+Identifying the Most Reliable T20 Players Under
+Pressure
+A Simple, Transparent & Context-Weighted Rating Framework (HL-PRS v5) Across 5,086 Matches & 287
+Competitions
+1. Executive Summary: Why Standard Stats Mislead
+In T20 cricket, raw career averages and economy rates treat every run and wicket equally. A batter
+scoring 65 off 40 balls on a flat pitch in a one-sided state-league fixture looks identical on paper to a
+batter scoring 65 off 40 balls to rescue a team from 22/4 in a T20 International or an IPL Playoff
+chase. Similarly, a bowler conceding 7.50 runs per over on a slow 130-run pitch appears superior to a
+death bowler conceding 7.80 runs per over in a 215-run shootout.
+To solve the Round 1 challenge, we built the Hierarchical Leverage-Weighted Pressure Rating
+System (HL-PRS v5). Written to be intuitive for coaches, scouts, and analysts alike, our system
+answers four core questions for every player:
+How tough was the situation? Did the player perform during a top-order collapse, a steep 175+ or
+200+ run chase, a low-total defense, a razor-thin final-over thriller, or a tournament knockout match?
+How strong was the competition? Performing in a T20 World Cup or the IPL carries higher weight
+than performing in domestic state leagues. *(Strictly T20 matches are used in the math; U19 ODI
+World Cup and List-A feats are noted only as qualitative background).*
+Did the player rise or choke in knockouts? How does their pressure output compare to their normal
+baseline, and do they consistently deliver—or repeatedly fail—in elimination playoff games?
+How many times have they proven it? Players who deliver across a larger sample of high-pressure
+matches earn a controlled longevity bonus over small-sample cameos.
+Forensic Data Cleaning: Three Critical Database Bugs Fixed Before Modeling
+Before calculating any ratings, we audited all 109,733 rows of player_match_stats.csv and
+5,086 rows of matches.csv and corrected three major upstream data errors that would otherwise
+distort player rankings:
+1. The Super Over N× Multiplication Bug (169 Rows / 16 Matches): In tied matches decided by a
+Super Over, every player who batted in the Super Over had their regulation row duplicated 2 or 3
+times—and their regulation runs, balls, fours, and sixes were multiplied by 2× or 3× inside each
+row. For example, in Match 28962 (India vs Afghanistan, 17/01/2024), Rinku Singh appeared 3
+times with 207 runs off 117 balls in each row (his true 69* off 39 × 3), and Rohit Sharma appeared
+twice with 242 runs off 138 balls (his true 121* off 69 × 2). We divided by the duplicate count and
+deduplicated to restore exact real-world scorecards.
+Rajasthan Royals SupeRR Selector Season 2 • Round 1 Methodology Report (HL-PRS v5) 	Page 1 of 12
+
+-- 1 of 12 --
+
+2. The Base-10 Fractional Over & 4.1+ Over Bug (848 Rows): The pre-computed economy_rate
+column divided runs by raw base-10 decimals (treating 1.5 overs as 1.50 instead of 11/6 = 1.833
+overs), and 848 spells recorded 4.1 to 5.1 overs due to extra deliveries in the 4th over. We
+recomputed exact legal balls bowled (capped at 24 balls per T20 spell).
+3. The Trailing-Space Knockout Bug (42 Matches): In matches.csv, 42 knockout games were
+stored as 'Quarter Final ' (with a trailing space) vs 18 as 'Quarter Final'. Stripping
+whitespace recovered all 60 quarter-finals.
+2. Pressure Definition: What Counts as Pressure and Why
+Rather than relying on reputation or memory, we reconstructed the exact scoreboard context of all
+4,989 linked matches by combining team batting totals, top-order dismissal logs, innings order (1st
+innings vs 2nd innings chase), tournament stage, and win margins. An innings or bowling spell is
+classified as High Pressure when at least one of six objective match situations occurs:
+ID Pressure
+Situation Clear Definition in the Dataset 	Frequency 	Why It Matters in Real Cricket
+P1 Top-Order
+Collapse (Bat)
+Batter walks in at No. 3–7 after ≥2 of
+the Top 3 got out for ≤12 runs (or ≥3
+of the Top 5 got out for ≤10 runs in a
+Severe Collapse).
+14,204 inns
+(17.7%)
+The batting side is reeling early.
+The incoming batter must stop
+the collapse without soaking up
+dot balls.
+P2 Steep Run
+Chase (Bat)
+Batting 2nd chasing a target of ≥175
+runs (or ≥200 runs in an Ultra
+Chase).
+15,486 inns
+(19.3%)
+No scoreboard freedom; batters
+must maintain 8.75 to 10+ RPO
+against defensive boundary
+riders.
+P3 Elimination
+Knockout
+(Both)
+Match stage is a true elimination
+game: Final, Qualifier, Semi Final,
+Eliminator, or Quarter Final *
+(excludes Super 4 group games)*.
+7,908 bat /
+5,925 bowl
+Tournament survival is on the
+line against a top-4 team. One
+bad session ends the season.
+P4 Close Thriller
+Finish (Both)
+Match decided by ≤12 runs, ≤3
+wickets, or a Super Over (Ultra-
+Close: ≤5 runs or ≤2 wickets).
+13,593 bat /
+9,528 bowl
+The contest goes down to the
+final overs where every single
+boundary or dot ball flips the
+winner.
+P5 Low-Total
+Defense
+(Bowl)
+Bowling 2nd to defend a sub-par 1st-
+innings score of 115 to 160 runs in a
+full 20-over match.
+10,222 spells
+(17.1%)
+Zero margin for bad balls.
+Bowlers must attack stumps
+and bowl dot balls to defend a
+small target.
+P6 Flat-Track
+Shootout
+(Bowl)
+Bowling in a high-scoring match
+where the overall match run rate
+exceeds 9.20 RPO (184+ par score).
+12,756 spells
+(21.3%)
+Tests which bowlers can
+execute yorkers and slower
+balls when pitch and boundary
+conditions favor batters.
+3. Performance Measurement & The Step-by-Step Formula
+Our rating system is built in four simple steps so anyone can follow and reproduce a player's score:
+Rajasthan Royals SupeRR Selector Season 2 • Round 1 Methodology Report (HL-PRS v5) 	Page 2 of 12
+
+-- 2 of 12 --
+
+Step 1: Match Leverage Weight (Li) — Not All Pressure Matches Are Equal
+Each high-pressure match receives a multiplier Li that combines the quality of the tournament, the
+importance of the round, and how severe the in-match crisis was:
+Match Leverage (Li) = Competition Weight (Wcomp) × Stage Multiplier (Mstage) ×
+Crisis Multiplier (Msituation)
+Strict Competition Hierarchy (Wcomp): T20 World Cup / Asia Cup (1.35) > Bilateral T20
+Internationals (1.25) > IPL (1.15) > India A Emerging/Rising Stars T20 (1.00) > Major Overseas
+Leagues [SA20, BBL, CPL, PSL, Blast, MLC] (0.95) > Syed Mushtaq Ali Trophy Elite (0.82) > State
+T20 Leagues [TNPL, Maharaja, UP T20, DPL, MPL, KCL] (0.70).
+Knockout Stage Multiplier (Mstage): Final (1.50×) > Semi-Final / Qualifier / Eliminator (1.35×) >
+Quarter-Final (1.25×) > Super 4 (1.10×) > League Match (1.00×).
+Crisis Situation Multiplier (Msituation): Starts at 1.00 and adds +0.55 for a Severe Collapse (or +0.35
+Standard Collapse), +0.55 for a Winning 200+ Chase or Winning Low-Total Defense (or +0.30 for 175+
+Chase / +0.35 Shootout), +0.45 for an Ultra-Close ≤5-run / ≤2-wicket / Super Over thriller (or +0.25
+Close Margin), and +0.20 for winning Player of the Match.
+Step 2: Pitch-Adjusted Baselines & Bayesian Small-Sample Smoothing
+To ensure a bowler at a high-scoring venue (like Bengaluru or Delhi) is compared fairly against a
+bowler on a slow turner (like Chennai or Mirpur), we compare every player against the Match Par
+Strike Rate and Match Par Economy Rate of that specific game (ΔSRpar and ΔEconpar). We also
+measure how much a player elevates their game under pressure compared to their normal career
+baseline (ΔAvg = Pressure Avg − Usual Avg and ΔSR = Pressure SR − Usual SR). To prevent a
+player with 2 lucky innings from outranking a 50-match veteran, we apply Empirical Bayes
+Smoothing, blending each player's leverage-weighted stats with the T20 role average (150-ball prior
+damper).
+Step 3: The Habitual Knockout Flop Deduction (−Pflop)
+A player cannot be called "reliable under pressure" if they dominate league games but repeatedly fail
+in knockout playoffs. If a top-7 batter gets out for ≤15 runs (with 1.25× extra severity for single-digit
+<10 dismissals) or a bowler concedes ≥9.50 RPO with ≤1 wicket in at least 45% of their true
+elimination knockouts (minimum 3 knockout games), our formula deducts up to −14.00 points.
+Players who deliver match-winning knockout heroics receive 0.00 penalty.
+Step 4: The Pressure Sample-Size & Longevity Bonus (+Bvol)
+To give a fair advantage to players who have delivered in high-pressure situations dozens of times
+over those with only a handful of games, we add a logarithmic volume bonus based on total pressure
+appearances (Npress) and high-impact pressure performances (Nimpact):
+Rajasthan Royals SupeRR Selector Season 2 • Round 1 Methodology Report (HL-PRS v5) 	Page 3 of 12
+
+-- 3 of 12 --
+
+Volume Bonus (Bvol) = 1.35 × ln(1 + Npress / 8) + 0.65 × ln(1 + Nimpact / 5)
+Final HL-PRS Score = Base Pressure Score − Knockout Flop Penalty (Pflop) + Big-
+Stage Bonus + Volume Bonus (Bvol)
+4. Fair Comparisons: Real-Match Scorecard Walkthroughs
+The table below demonstrates how the HL-PRS v5 formula evaluates famous high-pressure T20
+scorecards and habitual knockout failures across the dataset and the 2026 T20 World Cup / IPL
+2026:
+Match & Date 	Player & Scorecard Tournament &
+Stage Crisis Factors Triggered Multiplier /
+Penalty
+IND vs AFG
+(17/01/2024, ID
+28962)
+Rinku Singh: 69* (39)
+(Fixed from 207 off 117
+bug)
+Bilateral T20I
+(1.25) × Series
+(1.00)
+India collapsed to 22/4 (+0.55
+Severe Collapse) + Tied
+Double Super Over (+0.45) =
+2.00×
+Li = 2.50×
+Weight
+GT vs KKR
+(09/04/2023, ID
+20193)
+Rinku Singh: 48* (21)
+(5 sixes in final over)
+IPL (1.15) ×
+League (1.00)
+Winning 205 Chase (+0.55) +
+3-wicket last-ball finish
+(+0.25) + POTM (+0.20) =
+2.00×
+Li = 2.30×
+Weight
+GT vs MI
+(26/05/2023, ID
+21585)
+Shubman Gill: 129
+(60)
+(10 sixes, 7 fours)
+IPL (1.15) ×
+Qualifier 2 (1.35)
+Elimination Playoff Knockout
++ Player of the Match (+0.20)
+= 1.20×
+Li = 1.86×
+Weight
+2026 T20 WC
+Semi-Final &
+Final
+Sanju Samson: 89
+(42) & 89 (46)
+Finn Allen: 100* (33)
+vs SA
+Jasprit Bumrah: 4/15
+(4) Final
+T20 World Cup
+(1.35) × SF (1.35)
+& Final (1.50)
+World Cup Knockout Chases /
+7-run SF Thriller / World Cup
+Title Final POTM
+Li = 2.63×
+to 3.14×
+IPL Playoffs &
+WC/AC
+Knockouts
+Abhishek Sharma:
+3(4), 12(5), 2(5) in '24
+IPL KO; 5(6) AC Final;
+9(7) '26 WC SF
+IPL Playoffs & T20I
+Knockouts (15
+True KO Inns)
+Failed (≤15 runs) in 13 of 15
+true knockouts (86.7% Flop
+Rate); 5.50 Avg in IPL/AC
+playoffs.
+−14.00 pt
+Penalty
+(Drops out
+of Top 25)
+IPL Playoffs
+(Career &
+2021–25)
+Rohit Sharma: 11(10),
+8(7), 9(5), 8(7) in 4 of 7
+dataset KOs
+Travis Head: 0, 34, 0
+in '24 Playoffs
+IPL Playoffs & T20
+WC Knockouts
+Rohit: 57.1% KO flop rate
+(<16 career IPL Playoff Avg
+ex-'25 Elim). Head: 71.4% KO
+flop rate (11.3 Avg in '24 IPL
+KO).
+Rohit:
+−4.85 pts
+Head:
+−10.98 pts
+5. Visual Evidence: Pressure Performance & Uncontracted Domestic
+Scouting
+The two charts below illustrate how our Bayesian Pressure framework separates high-average, high-
+strike-rate batters and low-economy, fast-striking bowlers across the dataset, and ranks the top
+uncontracted Indian domestic targets for Rajasthan Royals ahead of the IPL 2027 Auction:
+Rajasthan Royals SupeRR Selector Season 2 • Round 1 Methodology Report (HL-PRS v5) 	Page 4 of 12
+
+-- 4 of 12 --
+
+Figure 1 — Bayesian High-Pressure Quadrants: (Left) Pressure Batting Average vs Pressure Strike Rate;
+players in the top-right quadrant combine high survival with rapid scoring under pressure. (Right) Pressure
+Bowling Economy vs Pressure Bowling Strike Rate (axes inverted so top-right represents elite run containment
+and rapid wicket-taking).
+Figure 2 — Rajasthan Royals IPL 2027 Uncontracted Domestic Target Board: Top 23 Indian uncapped
+players with zero current IPL franchise contract, color-coded by tactical role and annotated with career vs
+pressure splits.
+Rajasthan Royals SupeRR Selector Season 2 • Round 1 Methodology Report (HL-PRS v5) 	Page 5 of 12
+
+-- 5 of 12 --
+
+6. Final Player Rankings: Top 10 & Top 20 Batters Under Pressure
+Combining contracted international/IPL stars and non-contracted domestic performers under our
+strict T20-only HL-PRS v5 formula (including the +Bvol Sample-Size Bonus and −Pflop Knockout
+Penalty), here are the final ordered Top 20 Batters. Use Ranks 1 through 10 for the Unstop Batter
+Dropdowns:
+Rank Player Name
+(ID) Status Inns
+(Press)
+Press
+Avg /
+SR
+Base Vol
+Bonus
+HL-
+PRS
+Key T20 Pressure &
+Knockout Evidence *
+(+Non-T20 Add-On)*
+1 	Vaibhav
+Suryavanshi
+(50284)
+RR 	23 (18) 44.7 /
+228.5
+94.80 +2.39 97.19 1,028 IPL runs ('25–'26) @
+229.0 SR; IPL '26 Orange
+Cap & MVP (776r @ 237.3
+SR); 144 (42) India A T20.
+*(Add-On: 175 in '26 U19
+WC Final)*.
+2 	Sanju
+Samson
+(2258)
+CSK 	112
+(58)
+43.8 /
+168.4
+89.45 +4.08 93.53 58 pressure inns; 2026 T20
+WC Player of the
+Tournament (321r @
+80.25 Avg, 199.4 SR): 89
+(42) in SF & 89 (46) in
+Final; 477r in IPL '26.
+3 	Tilak Varma
+(7897)
+MI 	122
+(68)
+46.2 /
+146.1
+85.90 +4.39 90.29 68 pressure inns (>2,150
+pressure runs); 335 T20
+KO runs @ 41.9 Avg
+(11.1% flop rate); +5.9 Avg
+rise under pressure; 101*
+in IPL '26.
+4 	Shubman Gill
+(6288)
+GT 	131
+(60)
+40.1 /
+151.2
+84.20 +4.17 88.37 60 pressure inns; 732r in
+IPL '26 leading GT to Final;
+129 (60) vs MI in '23
+Qualifier 2; 604+ career
+T20 knockout runs.
+5 	Sai
+Sudharsan
+(23450)
+GT 	92 (42) 44.8 /
+151.4
+83.65 +3.64 87.29 42 pressure inns; 722r in
+IPL '26; 88.50 IPL Playoff
+Avg (96 off 47 in '23 Final,
+80 in '25 Eliminator; only
+12.5% KO flop rate).
+6 	Rajat Patidar
+(5039)
+RCB 	74 (44) 35.8 /
+167.4
+83.10 +3.65 86.75 44 pressure inns; Back-to-
+Back IPL '25 & '26
+Winning Captain (501r @
+192.0 SR in '26); 130.7 IPL
+Playoff Avg (0.0% KO
+flop rate).
+Rajasthan Royals SupeRR Selector Season 2 • Round 1 Methodology Report (HL-PRS v5) 	Page 6 of 12
+
+-- 6 of 12 --
+
+Rank Player Name
+(ID) Status Inns
+(Press)
+Press
+Avg /
+SR
+Base Vol
+Bonus
+HL-
+PRS
+Key T20 Pressure &
+Knockout Evidence *
+(+Non-T20 Add-On)*
+7 	Finn Allen
+(4847)
+KKR 	78 (38) 32.4 /
+194.8
+82.40 +3.35 85.75 38 pressure inns; 100* (33)
+vs SA in 2026 T20 WC
+Semi-Final (fastest WC
+100 ever); 349r @ 214.1
+SR (100* off 47) in IPL
+2026.
+8 	Rinku Singh
+(4708)
+KKR 	120
+(64)
+45.8 /
+160.2
+80.85 +4.28 85.13 64 pressure inns (1,800+
+pressure runs); highest
+leverage rescues in dataset
+(69* vs AFG from 22/4;
+48* vs GT); 59.0 Avg in IPL
+'26.
+9 	Jos Buttler
+(813)
+GT 	192
+(84)
+36.2 /
+149.4
+79.80 +4.75 84.55 84 pressure inns (2,650+
+pressure runs); 526r in IPL
+'26 for Finalist GT; 415+
+T20 KO runs @ 59.3
+IPL/WC Knockout Avg.
+10 	Sameer Rizvi
+(8238)
+DC 	66 (35) 48.0 /
+156.2
+81.18 +3.29 84.47 35 pressure inns (1,280+
+pressure runs @ 48.0 Avg,
++5.3 Avg rise under
+pressure); 220 T20 KO
+runs; India A middle-order
+mainstay.
+11 	Heinrich
+Klaasen
+(4260)
+SRH 	155
+(93)
+33.5 /
+156.4
+77.90 +4.92 82.82 93 pressure inns (2,450+
+pressure runs); 624r @
+48.0 Avg leading SRH to
+IPL '26 Playoffs; 251 T20
+knockout runs.
+12 	Shreyas Iyer
+(3647)
+PBKS 112 (56) 38.4 /
+154.5
+78.70 +4.01 82.71 56 pressure inns; 498r @
+55.3 Avg (101* HS) in IPL
+'26; 412 T20 knockout runs;
+led 3 franchises to IPL
+Finals.
+13 	Tim David
+(6396)
+RCB 	253
+(175)
+29.6 /
+163.1
+76.73 +5.93 82.66 175 high-pressure T20
+innings (3,850+ pressure
+runs @ 163.1 SR) —
+largest pressure batting
+sample in world cricket.
+14 	Ramandeep
+Singh (20006)
+KKR 	82 (43) 29.2 /
+175.5
+78.95 +3.55 82.50 43 pressure inns; 191.8 SR
+(47.0 Avg) in India A T20s
+(ID 2670); 212 T20
+knockout runs.
+15 	Nicholas
+Pooran
+(3125)
+LSG 	185
+(96)
+32.4 /
+164.8
+76.50 +4.95 81.45 96 pressure inns across
+T20I, IPL & global leagues;
+744 career T20 knockout
+runs @ 43.8 Avg.
+Rajasthan Royals SupeRR Selector Season 2 • Round 1 Methodology Report (HL-PRS v5) 	Page 7 of 12
+
+-- 7 of 12 --
+
+Rank Player
+Name (ID) Status Inns
+(Press)
+Press
+Avg /
+SR
+Base Vol
+Bonus
+HL-
+PRS
+Key T20 Pressure &
+Knockout Evidence *
+(+Non-T20 Add-On)*
+16 	Ashutosh
+Sharma
+(8101)
+DC 	32 (22) 35.1 /
+164.0
+78.50 +2.58 81.08 22 pressure inns (68.8%
+of career knocks under
+pressure); 0% T20 KO flop
+rate; India A death finisher.
+17 	David Miller
+(1077)
+LSG 	168
+(98)
+39.1 /
+143.5
+75.80 +5.00 80.80 98 pressure inns (>2,300
+pressure runs); 40.55 T20
+knockout average (only
+12.5% KO flop rate).
+18 	Babar Azam
+(2485)
+Non-IPL 	155
+(68)
+40.9 /
+137.1
+76.26 +4.37 80.63 68 pressure inns (2,334
+pressure runs @ 40.9 Avg)
+and 374 T20 knockout
+runs.
+19 	Suryakumar
+Yadav
+(1699)
+MI 	186
+(82)
+32.5 /
+155.2
+75.60 +4.71 80.31 82 pressure inns (2,350+
+pressure runs); 2026 T20
+World Cup Winning
+Captain for India.
+20 	LR Chethan
+(33074)
+Uncapped 47 (19) 36.3 /
+159.1
+74.97 +2.44 77.41 #1 Non-Contracted
+Indian Batter: 19
+pressure inns & 421 T20
+KO runs across 47
+SMAT/Maharaja games *
+(followed by Salman Nizar
+& Ajay Rohera)*.
+7. Final Player Rankings: Top 10 & Top 20 Bowlers Under Pressure
+Below are the final ordered Top 20 Bowlers Under Pressure under HL-PRS v5. Use Ranks 1
+through 10 for the Unstop Bowler Dropdowns:
+Rank Player
+Name (ID) Status Spells
+(Press)
+Press
+Econ /
+SR /
+Dot%
+Base Vol
+Bonus
+HL-
+PRS
+Key T20 Pressure, 2026
+T20 WC/IPL & Knockout
+Evidence
+1 	Jasprit
+Bumrah
+(2933)
+MI 	98 (56) 	6.82 /
+18.1 /
+46.8%
+88.45 +4.26 92.71 56 pressure spells; 2026 T20
+WC Final POTM (4/15 vs
+NZ) & Joint-Top Wicket-
+Taker (14W); 2024 WC
+POTM; 0.0% KO Flop Rate.
+2 	Sunil
+Narine
+(781)
+KKR 	223
+(128)
+6.43 /
+22.4 /
+41.5%
+81.90 +5.75 87.65 128 pressure spells (130+
+pressure Wkts); #1
+Economy in IPL 2026 (6.65
+RPO + 15W); 22 true T20
+knockout wickets.
+Rajasthan Royals SupeRR Selector Season 2 • Round 1 Methodology Report (HL-PRS v5) 	Page 8 of 12
+
+-- 8 of 12 --
+
+Rank Player Name
+(ID) Status Spells
+(Press)
+Press
+Econ /
+SR /
+Dot%
+Base Vol
+Bonus
+HL-
+PRS
+Key T20 Pressure, 2026
+T20 WC/IPL & Knockout
+Evidence
+3 	Rashid Khan
+(4722)
+GT 	259
+(138)
+7.10 /
+16.4 /
+39.2%
+80.25 +5.89 86.14 138 pressure spells
+(195+ pressure Wkts) —
+largest pressure wicket
+tally in T20 history; 21W in
+IPL '26 for Finalist GT; 24
+KO Wkts.
+4 	Rasikh
+Salam (7327)
+RCB 	39 (24) 	7.72 /
+13.5 /
+41.2%
+81.40 +2.83 84.23 24 pressure spells; 19
+wickets in IPL 2026
+(Best 4/24) for champion
+RCB; 9W in 4m (8.67 SR)
+for India A T20 (ID 2670);
+0% KO flop.
+5 	Wanindu
+Hasaranga
+(4900)
+RR 	202
+(107)
+7.45 /
+15.5 /
+37.6%
+75.79 +5.39 81.18 107 pressure spells (156+
+pressure Wkts) and 28
+true T20 knockout
+wickets (highest knockout
+wicket tally in dataset).
+6 	Josh
+Hazlewood
+(830)
+RCB 	101 (52) 	8.02 /
+16.4 /
+46.5%
+76.80 +4.09 80.89 52 pressure spells; 15W
+(Best 4/12) in IPL 2026
+anchoring RCB's 2nd
+straight IPL title; 16+ T20
+KO wickets; 46.5%
+pressure dot balls.
+7 	Muhammad
+Rohid
+(28655)
+Non-
+IPL
+34 (17) 	6.57 /
+11.3 /
+55.8%
+76.66 +2.41 79.07 #1 Non-Contracted Left-
+Arm Pacer: 26 pressure
+Wkts @ 6.57 Econ, 11.3
+SR & 55.8% dots; 10 T20
+KO Wkts; 1/13 in '26 WC
+warm-up.
+8 	Imran Tahir
+(724)
+Non-
+IPL
+129 (71) 	7.22 /
+15.8 /
+39.2%
+74.36 +4.64 79.00 71 pressure spells (102
+pressure Wkts) and 27
+true T20 knockout
+wickets; ageless big-
+game wicket-taker.
+9 	Mohsin Khan
+(6669)
+LSG 	54 (34) 	8.05 /
+14.4 /
+44.8%
+74.85 +3.38 78.23 34 pressure spells; only
+5-wicket haul of IPL
+2026 (5/23 vs KKR); 38+
+pressure Wkts @ 14.4 SR
+& 44.8% dots; 16 T20 KO
+wickets.
+10 	Nasum
+Ahmed
+(4658)
+Non-
+IPL
+99 (49) 	7.01 /
+21.2 /
+43.7%
+73.34 +3.99 77.33 49 pressure spells (48W
+@ 7.01 Econ & 43.7%
+dots); 0% KO flop rate *
+(ties #11 Noor Ahmad at
+77.33 with 99 pressure
+spells)*.
+Rajasthan Royals SupeRR Selector Season 2 • Round 1 Methodology Report (HL-PRS v5) 	Page 9 of 12
+
+-- 9 of 12 --
+
+Rank Player Name
+(ID) Status Spells
+(Press)
+Press
+Econ /
+SR /
+Dot%
+Base Vol
+Bonus
+HL-
+PRS
+Key T20 Pressure, 2026
+T20 WC/IPL & Knockout
+Evidence
+11 	Noor Ahmad
+(7967)
+CSK 	165 (99) 	7.65 /
+18.9 /
+41.5%
+72.10 +5.23 77.33 99 pressure spells (116+
+pressure Wkts) and 19 T20
+knockout wickets.
+12 	David Payne
+(1556)
+Non-
+IPL
+86 (49) 	7.64 /
+17.0 /
+42.6%
+72.92 +3.97 76.89 49 pressure spells (67
+pressure Wkts) and 20 T20
+knockout wickets.
+13 	Shaheen
+Shah Afridi
+(6355)
+Non-
+IPL
+68 (40) 	7.95 /
+15.2 /
+46.0%
+73.18 +3.65 76.83 40 pressure spells (56+
+pressure Wkts @ 46.0%
+dots) and 11 true T20
+knockout wickets.
+14 	Taskin
+Ahmed
+(2681)
+Non-
+IPL
+56 (33) 	7.56 /
+15.0 /
+50.2%
+73.39 +3.33 76.72 33 pressure spells (50.2%
+dot-ball percentage
+under pressure in T20Is;
+0% KO flop rate).
+15 	Anshul
+Kamboj
+(27964)
+CSK 	38 (23) 	7.85 /
+15.2 /
+42.0%
+73.80 +2.76 76.56 23 pressure spells; 21
+wickets in IPL 2026 (Tied-
+4th Purple Cap); 4W in
+3m for India A T20 (ID
+2670).
+16 	Dushan
+Hemantha
+(27504)
+Non-
+IPL
+27 (19) 	6.77 /
+11.6 /
+38.2%
+73.41 +2.51 75.92 19 pressure spells (33W @
+6.77 Econ & 11.6 Bowling
+SR); 5 T20 knockout
+wickets.
+17 	Blessing
+Muzarabani
+(6523)
+Non-
+IPL
+94 (50) 	7.26 /
+19.2 /
+45.5%
+71.60 +4.03 75.63 50 pressure spells (56+
+pressure Wkts @ 7.26
+Econ & 45.5% dots); 18.75
+Bowling Avg in IPL 2026.
+18 	AM
+Ghazanfar
+(32862)
+MI 	66 (42) 	7.44 /
+17.0 /
+47.7%
+71.85 +3.72 75.57 42 pressure spells (52+
+pressure Wkts @ 47.7%
+dots); 15W in IPL 2026; 11
+T20 knockout wickets.
+19 	Fazalhaq
+Farooqi
+(7240)
+RR 	148 (78) 	7.54 /
+16.2 /
+44.6%
+70.44 +4.79 75.23 78 pressure spells (104+
+pressure Wkts @ 44.6%
+dots) and 12 T20 knockout
+wickets.
+20 	Kuldeep
+Yadav (3644)
+DC 	92 (48) 	8.18 /
+16.5 /
+34.0%
+69.55 +3.95 73.50 48 pressure spells (62+
+pressure Wkts) and 12 true
+T20 knockout wickets *
+(followed by #21 Pradeep
+Dadhe, 72.35, #1
+Uncapped IND Pacer)*.
+Rajasthan Royals SupeRR Selector Season 2 • Round 1 Methodology Report (HL-PRS v5) 	Page 10 of 12
+
+-- 10 of 12 --
+
+8. Bonus Strategic Value: Top 10 Uncontracted Indian Targets for RR (IPL
+2027 Auction)
+To go beyond the general ranking and deliver actionable scouting value for Rajasthan Royals' 2027
+Auction table (where RR needs Indian middle-order/finisher power, right-arm off-spin to complement
+Ravindra Jadeja, and Indian death-overs seam support for Jofra Archer after conceding 9.92 RPO as
+a bowling unit in IPL 2026), we isolated the Top 10 Uncontracted Indian Uncapped Players (100%
+free of any IPL franchise contract):
+1. Mayank Rawat (ID 6461 | Spin All-Rounder & Finisher | Age 26.9 | Score: 82.23): 638 runs (42.5
+Avg / 167.0 SR; 40.1 Avg / 166.4 SR in 14 pressure inns) + 19 wickets (7.12 Econ, 6.76 Pressure
+Econ) for Delhi (SMAT) & East Delhi Riders. Solves RR's No. 6/7 finisher + right-arm off-spin gap.
+2. Salman Nizar (ID 6554 | LHB Middle-Order Crisis Rebuilder | Age 29.4 | Score: 89.63): 1,458 runs
+(76.7 Avg / 148.9 SR), rising to 76.4 Avg / 156.1 SR across 22 pressure innings for Kerala (SMAT) &
+Calicut Globstars. Ultimate middle-order collapse insurance.
+3. Ajay Rohera (ID 7542 | Top-Order Wicketkeeper-Batter | Age 29.5 | Score: 92.19): 1,067 runs (46.4
+Avg / 168.0 SR), accelerating to 47.1 Avg / 181.7 SR across 13 pressure innings for Madhya Pradesh
+(SMAT).
+4. Siddarth Yadav (ID 26831 | Young LHB Middle-Order Enforcer | Age 23.3 | Score: 82.92): 823 runs
+(37.4 Avg / 153.8 SR), rising to 43.6 Avg / 154.9 SR across 20 pressure innings in UP T20. *(RHB
+Peer: Akshat Raghuwanshi, ID 31518, Age 23.2, 60.2 Pressure Avg / 173.0 Pressure SR in MP T20
+& SMAT)*.
+5. LR Chethan (ID 33074 | High-Volume Reserve Opener | Age 26.5 | Score: 81.27): 1,465 runs
+across 47 SMAT & Maharaja T20 matches (34.1 Avg / 156.7 SR; 39.7 Pressure Avg / 161.5 Pressure
+SR; 421 knockout runs). *(High-SR Peer: Kartik Sharma, ID 43985, 54.9 Avg / 175.4 SR, 198.6
+Pressure SR)*.
+6. Tejasvi Dahiya (ID 58135 | Finisher Wicketkeeper-Batter | Age 24.6 | Score: 76.79): 547 runs (32.2
+Avg / 179.3 SR; 39.5 Pressure Avg / 175.6 Pressure SR) in DPL. *(Alt Finisher WK: Dhanraj Shinde,
+ID 42847, 37 games for Maharashtra/MPL at 197.5 SR)*.
+7. Pradeep Dadhe (ID 5951 | High-Dot Right-Arm Seam | Age 32.2 | Score: 78.35): 30 wickets in 25
+matches for Maharashtra (SMAT) & Ratnagiri Jets (MPL) at 7.13 Econ, 48.5% dot balls, and 6.51
+Pressure Economy (7 knockout wickets).
+8. Harikrishan U (ID 29796 | U-25 Right-Arm Control Seamer | Age 24.8 | Score: 75.27): 31 wickets in
+22 matches at 6.96 Economy, 14.52 Bowling SR, and 43.8% dot balls (7.07 Economy and 14.21
+Bowling SR under pressure).
+9. Tanay Sanghvi (ID 56185 | Right-Arm Death Strike Seamer | Age 26.9 | Score: 71.33): 47 wickets
+in 23 matches (2.04 wkts/game) at 9.55 Bowling SR—improving under pressure to 7.78 Economy
+and 8.43 Bowling SR (a wicket every 8.4 balls).
+10. Kunal Thorat (ID 42886 | Left-Arm Orthodox Strike Spinner | Age 26.9 | Score: 75.92): 34 wickets
+in 22 matches at 6.65 Economy & 13.24 Bowling SR (7.05 Pressure Economy). *(Left-Arm Pace Alt:
+Sunil Kumar, ID 45952, 35W @ 7.70 Econ, 47.9% dots & 11.0 Pressure Bowl SR; U-23 Wrist-Spin Alt:
+Kartik Chadha, ID 56559, 22W in 14m @ 13.09 SR)*.
+Rajasthan Royals SupeRR Selector Season 2 • Round 1 Methodology Report (HL-PRS v5) 	Page 11 of 12
+
+-- 11 of 12 --
+
+9. Reliability, Sensitivity Checks & Model Limitations
+Sensitivity Across Weighting Changes: Testing four different weight setups (Baseline HL-PRS v5,
+2× Knockout Weight, 2× Sample-Size Bonus, and Fixed Unadjusted Bayesian Shrinkage) yields a 0.94
+to 0.96 Spearman Rank Correlation. Our Top 10 Batters and Top 10 Bowlers remain stable across
+every sensitivity test.
+Match-Level vs. Delivery-Level Granularity: Because player_match_stats.csv records full-match
+player totals rather than ball-by-ball timestamps, our system reconstructs top-order collapses
+(top3_cheap_outs) and match par rates at the innings level. It cannot directly separate balls 1–10 of a
+batter's innings from balls 25–40, or split a bowler's overs 1–6 Powerplay economy from overs 17–20
+Death economy within the same 4-over spell.
+Non-Boundary Strike Rotation Proxy: Since batting dot balls faced are not listed in the match log,
+we track strike rotation under pressure using Non-Boundary Strike Rate: (Runs − Boundary
+Runs) / (Balls − Boundary Balls) × 100. Elite pressure anchors like Tilak Varma (81.4), Sai
+Sudharsan (79.8), and Salman Nizar (78.6) rotate strike on nearly 4 of every 5 non-boundary balls,
+preventing dot-ball pressure from building.
+Rajasthan Royals SupeRR Selector Season 2 • Round 1 Methodology Report (HL-PRS v5) 	Page 12 of 12
+
+-- 12 of 12 --
+

@@ -40,7 +40,7 @@ export default function ScoutingCharts({
   const [chartMode, setChartMode] = useState<'all' | 'released' | 'uncapped'>('all');
 
   const scatterData = RR_AUCTION_TARGET_BOARD.map((p) => {
-    const isBowler = ['Domestic/Overseas Death Pacer', 'Mystery Wrist Spinner / Attacking Leg-Spinner'].includes(p.targetRole || '');
+    const isBowler = Boolean(p.targetRole?.includes('Pacer') || p.targetRole?.includes('Spinner') || p.role?.includes('Bowler'));
     const isReleased = p.contractStatus?.includes('Released');
     
     return {

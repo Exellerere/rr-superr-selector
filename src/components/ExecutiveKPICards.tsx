@@ -58,14 +58,14 @@ export default function ExecutiveKPICards({
       id: 'purse-allocation',
       title: 'Target Auction Purse Allocation',
       value: `₹${totalAllocatedBudget.toFixed(2)} Cr`,
-      subtext: 'Of ₹34.50 Cr total Rajasthan Royals purse',
-      badge: `${Math.round((totalAllocatedBudget / 34.50) * 100)}% Cap`,
+      subtext: 'Of ₹27.05 Cr total Rajasthan Royals purse (6 Open Slots)',
+      badge: `${Math.round((totalAllocatedBudget / 27.05) * 100)}% Cap`,
       badgeColor: 'bg-[#F59E0B]/15 text-[#F59E0B] border-[#F59E0B]/30',
       icon: DollarSign,
       iconColor: 'text-[#F59E0B]',
       accentGlow: 'hover:border-[#F59E0B]/50 glow-gold',
-      metricDetail: `₹${(34.50 - totalAllocatedBudget).toFixed(2)} Cr reserve cushion preserved`,
-      statChange: 'Value-optimized'
+      metricDetail: `₹${Math.max(0, 27.05 - totalAllocatedBudget).toFixed(2)} Cr reserve cushion preserved`,
+      statChange: 'Nov 17, 2026 List'
     }
   ];
 

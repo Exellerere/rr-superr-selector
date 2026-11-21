@@ -1,9 +1,17 @@
 'use client';
 
 import React from 'react';
-import { Award, Activity, DollarSign, BookOpen, Target, Flame, Shield } from 'lucide-react';
+import { Award, Activity, DollarSign, BookOpen, Target, Flame, Shield, Database, Sparkles } from 'lucide-react';
 
-export type ActiveTab = 'rr-target-board' | 'open-batters' | 'open-bowlers' | 'pressure-explorer' | 'auction-simulator' | 'overview';
+export type ActiveTab =
+  | 'rr-target-board'
+  | 'open-batters'
+  | 'open-bowlers'
+  | 'v71-refinement'
+  | 'forensic-audit'
+  | 'pressure-explorer'
+  | 'auction-simulator'
+  | 'overview';
 
 interface NavbarProps {
   activeTab: ActiveTab;
@@ -14,12 +22,14 @@ interface NavbarProps {
 
 export default function Navbar({ activeTab, onTabChange, selectedCount, totalPurseAllocated }: NavbarProps) {
   const navTabs = [
-    { id: 'rr-target-board' as ActiveTab, label: 'RR IPL 2027 Target Board', icon: Target, badge: '14 Targets' },
-    { id: 'open-batters' as ActiveTab, label: 'Open Top 20 Batters', icon: Flame, badge: 'T20 WC & IPL' },
-    { id: 'open-bowlers' as ActiveTab, label: 'Open Top 20 Bowlers', icon: Shield, badge: 'T20 WC & IPL' },
+    { id: 'rr-target-board' as ActiveTab, label: 'RR IPL 2027 Strategy', icon: Target, badge: '₹27.05 Cr Purse' },
+    { id: 'open-batters' as ActiveTab, label: 'Top Batters (HL-PRS v7)', icon: Flame, badge: 'Report Top 20' },
+    { id: 'open-bowlers' as ActiveTab, label: 'Top Bowlers (HL-PRS v7)', icon: Shield, badge: 'Report Top 20' },
+    { id: 'v71-refinement' as ActiveTab, label: 'v7.1 Refinement (Kohli Exemption)', icon: Sparkles, badge: 'NEW Sensitivity' },
+    { id: 'forensic-audit' as ActiveTab, label: 'Forensic Audit', icon: Database, badge: '3 Bugs Fixed' },
     { id: 'pressure-explorer' as ActiveTab, label: 'Pressure Matrix', icon: Activity },
     { id: 'auction-simulator' as ActiveTab, label: 'Auction Simulator', icon: DollarSign, badge: selectedCount > 0 ? `${selectedCount} Active` : undefined },
-    { id: 'overview' as ActiveTab, label: 'HL-PRS v7 Engine Architecture', icon: BookOpen },
+    { id: 'overview' as ActiveTab, label: 'Engine Architecture', icon: BookOpen },
   ];
 
   return (
@@ -68,36 +78,47 @@ export default function Navbar({ activeTab, onTabChange, selectedCount, totalPur
             </div>
 
             <div className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 text-[11px] font-medium text-emerald-400">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span>HL-PRS v7 Active</span>
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="hidden sm:inline">v7 Baseline Synced</span>
             </div>
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <nav className="flex space-x-1 sm:space-x-2 overflow-x-auto pb-2 pt-1 no-scrollbar" aria-label="Tabs">
+        {/* Tab Navigation Strip */}
+        <nav className="flex space-x-1 overflow-x-auto pb-2 pt-1 scrollbar-none">
           {navTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
+            const isV71 = tab.id === 'v71-refinement';
+
             return (
               <button
                 key={tab.id}
                 onClick={() => onTabChange(tab.id)}
-                className={`group flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+                className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold transition-all relative ${
                   isActive
-                    ? 'bg-gradient-to-r from-[#EA1A85] to-[#D01474] text-white shadow-md shadow-[#EA1A85]/25 ring-1 ring-white/20'
-                    : 'text-slate-400 hover:bg-[#1E293B] hover:text-slate-200'
+                    ? isV71
+                      ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30 font-black'
+                      : 'bg-[#EA1A85] text-white shadow-md shadow-[#EA1A85]/30'
+                    : isV71
+                    ? 'text-amber-300 hover:text-white hover:bg-amber-500/10 border border-amber-500/30'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
                 }`}
               >
-                <Icon className={`h-3.5 w-3.5 transition-transform group-hover:scale-110 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                <Icon className="h-3.5 w-3.5" />
                 <span>{tab.label}</span>
                 {tab.badge && (
-                  <span className={`ml-1 rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
-                    isActive ? 'bg-white/20 text-white' : 'bg-[#EA1A85]/20 text-[#EA1A85] border border-[#EA1A85]/30'
-                  }`}>
+                  <span
+                    className={`ml-1 rounded px-1.5 py-0.2 text-[10px] font-semibold ${
+                      isActive
+                        ? isV71
+                          ? 'bg-slate-950 text-amber-300'
+                          : 'bg-white/20 text-white'
+                        : isV71
+                        ? 'bg-amber-500/20 text-amber-300'
+                        : 'bg-slate-800 text-slate-400'
+                    }`}
+                  >
                     {tab.badge}
                   </span>
                 )}
