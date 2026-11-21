@@ -2,36 +2,52 @@
 
 @layer base {
   :root {
-    --background: #0F172A;
+    --background: #0B162C;
     --foreground: #F8FAFC;
-    --card: #1E293B;
-    --card-foreground: #F8FAFC;
-    --border: #334155;
+    --card: #112240;
+    --card-elevated: #162B4D;
+    --border: rgba(234, 26, 133, 0.25);
     --rr-pink: #EA1A85;
-    --rr-gold: #F59E0B;
+    --rr-pink-hover: #FF2E9B;
+    --rr-gold: #D4AF37;
+    --rr-navy: #0B162C;
+    --rr-blue: #38BDF8;
   }
 }
 
 body {
-  background-color: #0F172A;
+  background-color: #0B162C;
   color: #F8FAFC;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   overflow-x: hidden;
+  background-image: 
+    radial-gradient(circle at 15% 15%, rgba(234, 26, 133, 0.04) 0%, transparent 40%),
+    radial-gradient(circle at 85% 85%, rgba(212, 175, 55, 0.03) 0%, transparent 45%),
+    radial-gradient(circle at 50% 50%, rgba(56, 189, 248, 0.02) 0%, transparent 60%);
+  background-attachment: fixed;
+}
+
+/* Subtle Rajasthani Jharokha / Geometric Lattice Watermark Pattern */
+.bg-jharokha {
+  background-image: radial-gradient(rgba(234, 26, 133, 0.05) 1px, transparent 1px), radial-gradient(rgba(212, 175, 55, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: 0 0, 12px 12px;
 }
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0B1120;
+  background: #0B162C;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: #1E293B;
   border-radius: 4px;
+  border: 1px solid rgba(234, 26, 133, 0.2);
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -40,20 +56,44 @@ body {
 
 /* Glow effects */
 .glow-pink {
-  box-shadow: 0 0 25px -5px rgba(234, 26, 133, 0.35);
+  box-shadow: 0 0 25px -4px rgba(234, 26, 133, 0.4);
 }
 
 .glow-gold {
-  box-shadow: 0 0 25px -5px rgba(245, 158, 11, 0.35);
+  box-shadow: 0 0 25px -4px rgba(212, 175, 55, 0.4);
 }
 
 .glow-blue {
-  box-shadow: 0 0 25px -5px rgba(56, 189, 248, 0.25);
+  box-shadow: 0 0 25px -4px rgba(56, 189, 248, 0.3);
 }
 
-.glass-card {
-  background: rgba(30, 41, 59, 0.75);
+/* Elevated Card Surfaces */
+.rr-card {
+  background: #112240;
+  border: 1px solid rgba(234, 26, 133, 0.25);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.rr-card-elevated {
+  background: #162B4D;
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.rr-gradient-bar {
+  background: linear-gradient(90deg, #EA1A85 0%, #D4AF37 100%);
+}
+
+.rr-gradient-pill {
+  background: linear-gradient(135deg, #EA1A85 0%, #B81165 100%);
+}
+
+.rr-gradient-gold-pill {
+  background: linear-gradient(135deg, #D4AF37 0%, #A88B27 100%);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }
