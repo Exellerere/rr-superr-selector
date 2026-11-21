@@ -107,23 +107,43 @@ export default function FranchiseHeader({
 
           {/* Right: Live Franchise Status Strip */}
           <div className="flex items-center gap-2 flex-wrap text-xs">
-            {/* Live Purse Pill */}
-            <div className="rounded-xl bg-[#112240] border border-[#D4AF37]/40 px-3.5 py-1.5 shadow-md flex items-center gap-2">
-              <span className="text-[10px] text-slate-400 uppercase font-black tracking-wider">Purse Remaining</span>
-              <span className="font-mono font-black text-sm text-[#D4AF37]">
-                ₹{(27.05 - totalPurseAllocated).toFixed(2)} Cr
-              </span>
-              <span className="text-[10px] text-slate-500">/ ₹27.05 Cr</span>
+            {/* Primary: Total Remaining Purse (After Player Retentions) */}
+            <div className="rounded-xl bg-[#112240] border-2 border-[#D4AF37] px-3.5 py-1.5 shadow-lg flex items-center gap-2.5">
+              <div className="flex flex-col text-left">
+                <span className="text-[9px] text-[#D4AF37] uppercase font-black tracking-wider">
+                  Total Remaining Purse
+                </span>
+                <span className="text-[9px] text-slate-300 font-semibold">
+                  (After Player Retentions)
+                </span>
+              </div>
+              <div className="flex items-baseline gap-1 border-l border-slate-700/80 pl-2.5">
+                <span className="font-mono font-black text-base text-white">
+                  ₹27.05
+                </span>
+                <span className="text-xs font-bold text-[#D4AF37]">Cr</span>
+              </div>
             </div>
 
             {/* Open Slots Pill */}
             <div className="rounded-xl bg-[#112240] border border-[#38BDF8]/40 px-3 py-1.5 shadow-md flex items-center gap-2">
-              <span className="text-[10px] text-slate-400 uppercase font-black tracking-wider">Open Slots</span>
-              <span className="font-mono font-bold text-sm text-[#38BDF8]">
-                {Math.max(0, 6 - selectedTargetsCount)} / 6
+              <div className="flex flex-col text-left">
+                <span className="text-[9px] text-slate-400 uppercase font-black tracking-wider">Open Slots</span>
+                <span className="text-[9px] text-slate-400 font-semibold">(3 Overseas)</span>
+              </div>
+              <span className="font-mono font-black text-base text-[#38BDF8] border-l border-slate-700/80 pl-2">
+                6
               </span>
-              <span className="text-[10px] text-slate-400 font-semibold">(3 Overseas)</span>
             </div>
+
+            {/* Sidelined Simulation Info */}
+            {selectedTargetsCount > 0 && (
+              <div className="hidden xl:flex items-center gap-1.5 rounded-xl bg-slate-900/80 border border-slate-800 px-2.5 py-1.5 text-[11px] text-slate-400">
+                <span>Simulated Plan:</span>
+                <span className="font-mono font-bold text-slate-200">₹{totalPurseAllocated.toFixed(2)} Cr</span>
+                <span className="text-[10px] text-slate-500">({selectedTargetsCount} targets)</span>
+              </div>
+            )}
 
             {/* Model Badge */}
             <div className="rounded-xl bg-[#112240] border border-[#EA1A85]/50 px-3 py-1.5 shadow-md flex items-center gap-2">

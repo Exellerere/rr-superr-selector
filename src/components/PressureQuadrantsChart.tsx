@@ -232,8 +232,10 @@ export default function PressureQuadrantsChart({
             <Scatter
               name="Players"
               data={chartData}
-              onClick={(e: any) => {
-                if (e && e.originalPlayer) onSelectPlayer(e.originalPlayer);
+              onClick={(e: unknown) => {
+                if (e && typeof e === 'object' && 'originalPlayer' in e) {
+                  onSelectPlayer((e as { originalPlayer: HLPRSPlayer }).originalPlayer);
+                }
               }}
               className="cursor-pointer"
             >

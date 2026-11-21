@@ -47,15 +47,15 @@ export default function KPISummaryStrip() {
       sparkHeights: [85, 90, 75, 95, 80, 100, 92]
     },
     {
-      id: 'kpi-target',
-      label: 'TOP RELEASED RR AUCTION TARGET',
-      value: 'Mitchell Owen & Hasaranga',
-      subtext: '₹27.05 Cr Purse • 6 Open Slots',
-      highlight: 'Solves 5 RR Squad Gaps',
+      id: 'kpi-purse',
+      label: 'TOTAL REMAINING PURSE (AFTER RETENTIONS)',
+      value: '₹27.05 Cr',
+      subtext: '6 Open Slots (3 Overseas) • 19 Retained',
+      highlight: 'Available for IPL 2027 Auction',
       icon: Target,
-      accentColor: 'text-emerald-400',
-      sparkColor: 'bg-emerald-400',
-      sparkHeights: [50, 65, 45, 75, 85, 60, 90]
+      accentColor: 'text-[#D4AF37]',
+      sparkColor: 'bg-[#D4AF37]',
+      sparkHeights: [80, 85, 70, 90, 85, 95, 100]
     }
   ];
 

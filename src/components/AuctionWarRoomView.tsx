@@ -170,13 +170,17 @@ export default function AuctionWarRoomView({
           </button>
         </div>
 
-        {/* Right: Purse Indicator */}
-        <div className="text-right font-mono">
-          <span className="text-[10px] text-slate-400 uppercase font-black block">Purse Remaining</span>
-          <span className="text-base font-black text-[#D4AF37]">
-            ₹{(27.05 - totalSpent).toFixed(2)} Cr
+        {/* Right: Total Remaining Purse (After Player Retentions) */}
+        <div className="text-right font-mono bg-[#0B162C] px-3.5 py-1.5 rounded-xl border border-[#D4AF37]/60 shadow-md">
+          <span className="text-[9px] text-[#D4AF37] uppercase font-black block tracking-wider">
+            Total Remaining Purse
           </span>
-          <span className="text-[10px] text-slate-500 block">MAX SLOTS: 6</span>
+          <span className="text-lg font-black text-white">
+            ₹27.05 <span className="text-xs text-[#D4AF37]">Cr</span>
+          </span>
+          <span className="text-[9px] text-slate-400 block font-sans">
+            (After Player Retentions) • 6 Slots
+          </span>
         </div>
       </div>
 
@@ -411,7 +415,7 @@ export default function AuctionWarRoomView({
             <div className="border-b border-slate-800 pb-2">
               <h3 className="text-xs font-black uppercase tracking-wider text-white flex items-center justify-between">
                 <span>Decision &amp; Bid Tracker</span>
-                <span className="text-[10px] text-slate-400 font-mono">₹27.05 Cr Cap</span>
+                <span className="text-[10px] text-[#D4AF37] font-mono font-bold">₹27.05 Cr Available</span>
               </h3>
             </div>
 
